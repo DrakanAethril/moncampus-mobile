@@ -25,12 +25,16 @@ if (flutterVersionName == null) {
 
 android {
     namespace = "com.beaupeyrat.moncampus_mobile"
-    compileSdk = flutter.compileSdkVersion
+    // flutter.compileSdkVersion is too low for flutter_secure_storage's current Android module -
+    // this Flutter SDK install (3.22.2) predates that plugin's newer releases. Hardcoded to the
+    // platform actually installed locally (see `flutter doctor -v`) rather than relying on the
+    // Flutter tool's own (outdated) default.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     defaultConfig {
