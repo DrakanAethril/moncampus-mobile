@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/main_shell.dart';
 import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
 
@@ -29,8 +29,8 @@ class MonCampusApp extends StatelessWidget {
   }
 }
 
-/// Switches between LoginScreen and HomeScreen based on AuthService's state, so nothing else in
-/// the widget tree has to think about auth/navigation itself.
+/// Switches between LoginScreen and MainShell (the 5-tab bottom nav) based on AuthService's
+/// state, so nothing else in the widget tree has to think about auth/navigation itself.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -44,6 +44,6 @@ class AuthGate extends StatelessWidget {
       );
     }
 
-    return auth.isAuthenticated ? const HomeScreen() : const LoginScreen();
+    return auth.isAuthenticated ? const MainShell() : const LoginScreen();
   }
 }

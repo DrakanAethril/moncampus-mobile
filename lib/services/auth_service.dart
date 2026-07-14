@@ -38,6 +38,10 @@ class AuthService extends ChangeNotifier {
   bool get isAuthenticated => _token != null && _currentUser != null;
   bool get isLoading => _isLoading;
 
+  /// Read-only - other services (TimetableService, MessagingService, ...) need it to build their
+  /// own Authorization headers, but only AuthService ever writes it.
+  String? get token => _token;
+
   /// Called once at app startup: restores a previously stored token and validates it against
   /// GET /api/me (an expired/revoked token just falls back to the login screen).
   Future<void> tryAutoLogin() async {

@@ -14,6 +14,21 @@ class AppColors {
   static const ink = Color(0xFF1C2B36);
   static const text = Color(0xFF3D4F5C);
   static const muted = Color(0xFF5B6C79);
+  static const faint = Color(0xFF8A99A6);
+
+  // Semantic background/text pairs - same tokens as the web's campus-theme.css.
+  static const blueBg = Color(0xFFDCEBF7);
+  static const blueTx = Color(0xFF12507E);
+  static const goldBg = Color(0xFFF5E9CF);
+  static const goldTx = Color(0xFF7A5417);
+  static const greenBg = Color(0xFFE3EDE6);
+  static const greenTx = Color(0xFF25543C);
+  static const redBg = Color(0xFFF5E0DC);
+  static const redTx = Color(0xFFA43E2E);
+  static const purpleBg = Color(0xFFE9E2F0);
+  static const purpleTx = Color(0xFF4E3A66);
+  static const tealBg = Color(0xFFDDE8EE);
+  static const tealTx = Color(0xFF2F5468);
 }
 
 class AppTheme {

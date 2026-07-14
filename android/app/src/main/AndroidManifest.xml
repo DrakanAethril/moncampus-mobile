@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Only present in the debug/profile manifests by default (Flutter's template scopes it there
+         for VM service/hot-reload) - the app itself needs it in every build type to reach the API. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="moncampus_mobile"
         android:name="${applicationName}"
