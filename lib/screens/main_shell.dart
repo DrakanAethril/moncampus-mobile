@@ -64,7 +64,10 @@ class _MainShellState extends State<MainShell> {
       body: IndexedStack(
         index: _index,
         children: [
-          HomeScreen(onViewTimetable: () => _onDestinationSelected(1)),
+          HomeScreen(
+            onViewTimetable: () => _onDestinationSelected(1),
+            onViewAgenda: () => _onDestinationSelected(2),
+          ),
           _visitedIndices.contains(1) ? const TimetableScreen() : const SizedBox.shrink(),
           _visitedIndices.contains(2) ? const AgendaScreen() : const SizedBox.shrink(),
           _visitedIndices.contains(3) ? MessagesScreen(onUnreadChanged: _refreshUnreadCount) : const SizedBox.shrink(),

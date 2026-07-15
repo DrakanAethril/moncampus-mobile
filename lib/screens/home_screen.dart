@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/agenda_event.dart';
+import '../models/announcement.dart';
 import '../models/app_user.dart';
 import '../models/lesson_session.dart';
+import '../services/agenda_service.dart';
+import '../services/announcement_service.dart';
 import '../services/auth_service.dart';
 import '../services/timetable_service.dart';
 import '../theme/app_theme.dart';
 
-/// Home tab (design 3a) - brand header, greeting, next-class card, and today's mini schedule
-/// ("Ma journée"). The design's gold "Annonces" banner and separate "Agenda" preview card are
-/// left out: there's no Announcement/Event entity on the backend to back them with real data (see
-/// [[project_mobile_app_ldap_jwt_progress]] for that gap), and this app doesn't invent fake data.
+/// Home tab (design 3a) - brand header, greeting, announcement banner, next-class card, today's
+/// mini schedule ("Ma journée"), and an upcoming-events preview ("Agenda"). The design's banner
+/// and Agenda preview used to be left out for lack of a backend Announcement/Event entity - both
+/// now exist (App\Controller\Api\AnnouncementController, App\Controller\Api\AgendaController), see
+/// [[project_mobile_app_ldap_jwt_progress]] for that history.
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.onViewTimetable});
+  const HomeScreen({super.key, this.onViewTimetable, this.onViewAgenda});
 
   final VoidCallback? onViewTimetable;
+  final VoidCallback? onViewAgenda;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -22,8 +28,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _timetableService = TimetableService();
+  final _announcementService = AnnouncementService();
+  final _agendaService = AgendaService();
 
   List<LessonSession>? _todaySessions;
+  List<Announcement>? _announcements;
+  List<AgendaEvent>? _upcomingEvents;
   bool _loading = true;
 
   static const _weekdayNames = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
@@ -46,21 +56,28 @@ class _HomeScreenState extends State<HomeScreen> {
     final monday = now.subtract(Duration(days: now.weekday - 1));
     final sunday = monday.add(const Duration(days: 6));
 
-    try {
-      final sessions = await _timetableService.fetchWeek(token, from: monday, to: sunday);
-      final today = DateTime(now.year, now.month, now.day);
-      final todaySessions = sessions.where((session) => _isSameDay(session.day, today)).toList()
-        ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    setState(() => _loading = true);
 
-      if (mounted) {
-        setState(() {
-          _todaySessions = todaySessions;
-          _loading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
+    // Independent widgets, independent failures - one card not loading shouldn't blank the
+    // others (unlike TimetableScreen's single-source dependency).
+    final results = await Future.wait([
+      _timetableService.fetchWeek(token, from: monday, to: sunday).catchError((_) => <LessonSession>[]),
+      _announcementService.fetchAnnouncements(token).catchError((_) => <Announcement>[]),
+      _agendaService.fetchEvents(token).catchError((_) => <AgendaEvent>[]),
+    ]);
+
+    if (!mounted) return;
+
+    final today = DateTime(now.year, now.month, now.day);
+    final todaySessions = (results[0] as List<LessonSession>).where((session) => _isSameDay(session.day, today)).toList()
+      ..sort((a, b) => a.startTime.compareTo(b.startTime));
+
+    setState(() {
+      _todaySessions = todaySessions;
+      _announcements = results[1] as List<Announcement>;
+      _upcomingEvents = results[2] as List<AgendaEvent>;
+      _loading = false;
+    });
   }
 
   bool _isSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
@@ -97,11 +114,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _buildGreeting(user),
                   const SizedBox(height: 16),
+                  if (_announcements != null && _announcements!.isNotEmpty) ...[
+                    _buildAnnouncementBanner(_announcements!.first),
+                    const SizedBox(height: 14),
+                  ],
                   if (_nextSession != null) ...[
                     _buildNextSessionCard(_nextSession!),
                     const SizedBox(height: 14),
                   ],
                   _buildTodayCard(),
+                  if (_upcomingEvents != null && _upcomingEvents!.isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    _buildAgendaCard(_upcomingEvents!),
+                  ],
                 ],
               ),
             ),
@@ -163,6 +188,43 @@ class _HomeScreenState extends State<HomeScreen> {
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.navy),
         ),
       ],
+    );
+  }
+
+  Widget _buildAnnouncementBanner(Announcement announcement) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [AppColors.gold, AppColors.goldStrong]),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: const BoxDecoration(color: AppColors.navy, shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: const Text('!', style: TextStyle(color: Color(0xFFE8C574), fontWeight: FontWeight.bold, fontSize: 12)),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 13, height: 1.35, color: AppColors.navy),
+                children: [
+                  TextSpan(text: announcement.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const TextSpan(text: '  '),
+                  TextSpan(text: announcement.plainTextBody.split('\n').first),
+                ],
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -283,6 +345,83 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  Widget _buildAgendaCard(List<AgendaEvent> events) {
+    final preview = events.take(2).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                const Text('Agenda', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.ink)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: widget.onViewAgenda,
+                  child: const Text(
+                    'Tout voir →',
+                    style: TextStyle(color: AppColors.brand, fontWeight: FontWeight.w600, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(children: preview.map(_buildAgendaPreviewRow).toList()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAgendaPreviewRow(AgendaEvent event) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 40,
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            decoration: BoxDecoration(color: AppColors.goldBg, borderRadius: BorderRadius.circular(8)),
+            child: Column(
+              children: [
+                Text(_weekdayAbbrev(event.startAt), style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.goldTx)),
+                Text('${event.startAt.day}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.goldTx)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(event.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.ink)),
+                Text(
+                  [_formatTime(event.startAt), event.location].whereType<String>().join(' · '),
+                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _weekdayAbbrev(DateTime date) => const ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'][date.weekday - 1];
+
+  String _formatTime(DateTime dateTime) =>
+      '${dateTime.hour.toString().padLeft(2, '0')}h${dateTime.minute.toString().padLeft(2, '0')}';
 }
 
 /// Shared by HomeScreen and TimetableScreen - both color-code session cards from the API's hex
