@@ -1,3 +1,5 @@
+import '../utils/html_text.dart';
+
 /// Mirrors GET /api/messages/threads's row shape (App\Controller\Api\MessagesController).
 class MessageThreadSummary {
   const MessageThreadSummary({
@@ -63,21 +65,8 @@ class MessageItem {
   final DateTime sentAt;
   final List<MessageAttachment> attachments;
 
-  /// The backend stores the rich-text (HugeRTE) sanitized HTML body as-is - this is a small
-  /// tags-stripping step for a plain-text display, not a full HTML renderer (no new dependency
-  /// for what's still a browsing-only mobile client).
-  String get plainTextBody {
-    final withoutTags = body.replaceAll(RegExp(r'<[^>]*>'), '\n');
-    final decoded = withoutTags
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'");
-
-    return decoded.replaceAll(RegExp(r'\n{2,}'), '\n\n').trim();
-  }
+  /// The backend stores the rich-text (HugeRTE) sanitized HTML body as-is - see utils/html_text.dart.
+  String get plainTextBody => stripHtmlToPlainText(body);
 }
 
 class MessageThreadDetail {
