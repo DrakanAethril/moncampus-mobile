@@ -52,6 +52,8 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   integration_test:
     sdk: flutter
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -65,7 +67,11 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/beaupeyrat-logo.png
+    - assets/icons/moncampus/ic_launcher_48.png
+    - assets/icons/moncampus/ic_launcher_72.png
+    - assets/icons/moncampus/ic_launcher_96.png
+    - assets/icons/moncampus/ic_launcher_144.png
+    - assets/icons/moncampus/ic_launcher_192.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware
@@ -92,3 +98,28 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
+
+# Icône 6c « Bleu & or » (design/design_campus_manager reference/e-CO.dc.html, écran 6f) -
+# adaptive_icon_background/foreground/monochrome cover Android 8+ adaptive icons + the Android
+# 13+ themed monochrome layer; flutter_launcher_icons also (re)generates the legacy mipmap-*
+# fallback PNGs for API <26 from image_path.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icons/moncampus/ic_launcher_192.png"
+  adaptive_icon_background: "#1B6BA8"
+  adaptive_icon_foreground: "assets/icons/moncampus/adaptive_foreground_432.png"
+  adaptive_icon_monochrome: "assets/icons/moncampus/adaptive_monochrome_432.png"
+
+# Splash (écran 6h) - Android 12+'s native SplashScreen API draws $color + $image before the
+# Flutter engine is even up; the app's own first frame should repeat the same blue/badge/wordmark
+# so the transition from system window to Flutter UI is seamless.
+flutter_native_splash:
+  color: "#1B6BA8"
+  image: "assets/icons/moncampus/splash_icon.png"
+  android_12:
+    color: "#1B6BA8"
+    image: "assets/icons/moncampus/splash_icon.png"
+  android: true
+  ios: false
+  web: false

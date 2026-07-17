@@ -30,7 +30,8 @@ android {
     // platform actually installed locally (see `flutter doctor -v`) rather than relying on the
     // Flutter tool's own (outdated) default.
     compileSdk = 36
-    ndkVersion = flutter.ndkVersion
+    // Same reasoning as compileSdk above - a plugin needs a newer NDK than this Flutter SDK's own default.
+    ndkVersion = "26.1.10909125"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
