@@ -23,6 +23,18 @@ if (flutterVersionName == null) {
     flutterVersionName = "1.0"
 }
 
+// Release signing - see android/key.properties.example. The file itself (and the .jks it points
+// at) are never committed; generated once by the release-mobile-apps skill. Falls back to the
+// debug config when absent so `flutter run`/CI checkouts without the keystore still build.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+def hasReleaseSigning = keystorePropertiesFile.exists()
+if (hasReleaseSigning) {
+    keystorePropertiesFile.withReader("UTF-8") { reader ->
+        keystoreProperties.load(reader)
+    }
+}
+
 android {
     namespace = "com.beaupeyrat.moncampus_mobile"
     // flutter.compileSdkVersion is too low for flutter_secure_storage's current Android module -
@@ -51,11 +63,20 @@ android {
         versionName = flutterVersionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile = file(keystoreProperties["storeFile"])
+                storePassword = keystoreProperties["storePassword"]
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            signingConfig = hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
         }
     }
 }
