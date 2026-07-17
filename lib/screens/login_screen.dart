@@ -67,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Image.asset(
-                    'assets/images/beaupeyrat-logo.png',
+                    'assets/icons/moncampus/ic_launcher_192.png',
                     height: 96,
                   ),
                   const SizedBox(height: 32),
