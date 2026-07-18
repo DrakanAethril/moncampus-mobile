@@ -5,11 +5,14 @@ import '../models/agenda_event.dart';
 import '../models/announcement.dart';
 import '../models/app_user.dart';
 import '../models/lesson_session.dart';
+import '../models/quiz_live_state.dart';
 import '../services/agenda_service.dart';
 import '../services/announcement_service.dart';
 import '../services/auth_service.dart';
+import '../services/quiz_live_service.dart';
 import '../services/timetable_service.dart';
 import '../theme/app_theme.dart';
+import 'quiz_live_join_screen.dart';
 
 /// Home tab (design 3a) - brand header, greeting, announcement banner, next-class card, today's
 /// mini schedule ("Ma journée"), and an upcoming-events preview ("Agenda"). The design's banner
@@ -30,10 +33,12 @@ class _HomeScreenState extends State<HomeScreen> {
   final _timetableService = TimetableService();
   final _announcementService = AnnouncementService();
   final _agendaService = AgendaService();
+  final _quizLiveService = QuizLiveService();
 
   List<LessonSession>? _todaySessions;
   List<Announcement>? _announcements;
   List<AgendaEvent>? _upcomingEvents;
+  QuizLiveActiveSession? _activeLiveSession;
   bool _loading = true;
 
   static const _weekdayNames = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
@@ -64,6 +69,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _timetableService.fetchWeek(token, from: monday, to: sunday).catchError((_) => <LessonSession>[]),
       _announcementService.fetchAnnouncements(token).catchError((_) => <Announcement>[]),
       _agendaService.fetchEvents(token).catchError((_) => <AgendaEvent>[]),
+      _quizLiveService.fetchActive(token).catchError((_) => null),
     ]);
 
     if (!mounted) return;
@@ -76,6 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _todaySessions = todaySessions;
       _announcements = results[1] as List<Announcement>;
       _upcomingEvents = results[2] as List<AgendaEvent>;
+      _activeLiveSession = results[3] as QuizLiveActiveSession?;
       _loading = false;
     });
   }
@@ -114,6 +121,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _buildGreeting(user),
                   const SizedBox(height: 16),
+                  if (_activeLiveSession != null) ...[
+                    _buildLiveQuizBanner(_activeLiveSession!),
+                    const SizedBox(height: 14),
+                  ],
                   if (_announcements != null && _announcements!.isNotEmpty) ...[
                     _buildAnnouncementBanner(_announcements!.first),
                     const SizedBox(height: 14),
@@ -188,6 +199,50 @@ class _HomeScreenState extends State<HomeScreen> {
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.navy),
         ),
       ],
+    );
+  }
+
+  // Mobile counterpart to the "Concours en cours" card on program/quiz_mine.html.twig - code-less
+  // discovery, no room code (see App\Repository\QuizLiveSessionRepository::findActiveForProgram()'s
+  // docblock on the backend for why).
+  Widget _buildLiveQuizBanner(QuizLiveActiveSession session) {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => QuizLiveJoinScreen(sessionId: session.sessionId, quizName: session.name, hostName: session.hostName),
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: AppColors.navy, borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(width: 9, height: 9, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
+                const SizedBox(width: 8),
+                const Text(
+                  'CONCOURS EN COURS',
+                  style: TextStyle(color: AppColors.gold, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 2),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(session.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16)),
+            const SizedBox(height: 3),
+            Text('Lancé par ${session.hostName}', style: const TextStyle(color: Color(0xFF9DB4C6), fontSize: 12.5)),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(color: AppColors.gold, borderRadius: BorderRadius.circular(10)),
+              alignment: Alignment.center,
+              child: const Text('Rejoindre le concours', style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
