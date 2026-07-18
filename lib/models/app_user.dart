@@ -8,6 +8,8 @@ class AppUser {
     this.email,
     this.firstname,
     this.lastname,
+    this.contactEmail,
+    this.contactEmailVerified = false,
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
@@ -16,6 +18,8 @@ class AppUser {
         email: json['email'] as String?,
         firstname: json['firstname'] as String?,
         lastname: json['lastname'] as String?,
+        contactEmail: json['contactEmail'] as String?,
+        contactEmailVerified: json['contactEmailVerified'] as bool? ?? false,
         roles: (json['roles'] as List<dynamic>? ?? const [])
             .map((role) => role as String)
             .toList(),
@@ -27,6 +31,12 @@ class AppUser {
   final String? firstname;
   final String? lastname;
   final List<String> roles;
+
+  /// Local-only address (App\Entity\User::$contactEmail on the backend) - distinct from [email],
+  /// the LDAP-synced directory address. Drives the 3-state machine on ProfileScreen: null =
+  /// missing, set+!verified = pending, set+verified = verified.
+  final String? contactEmail;
+  final bool contactEmailVerified;
 
   /// French convention: "NOM Prénom" (surname upper-cased, first name as-is) - falls back to the
   /// login when LDAP hasn't supplied a name at all (see App\Security\LdapUserMapper on the API

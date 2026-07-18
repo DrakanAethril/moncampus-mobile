@@ -10,11 +10,13 @@ class AppColors {
   static const goldStrong = Color(0xFFDBB35F);
   static const bg = Color(0xFFF2F5F8);
   static const surface = Color(0xFFFFFFFF);
+  static const surfaceAlt = Color(0xFFF7FAFC);
   static const border = Color(0xFFDDE5EC);
   static const ink = Color(0xFF1C2B36);
   static const text = Color(0xFF3D4F5C);
   static const muted = Color(0xFF5B6C79);
   static const faint = Color(0xFF8A99A6);
+  static const warnTx = Color(0xFFB0722A);
 
   // Semantic background/text pairs - same tokens as the web's campus-theme.css.
   static const blueBg = Color(0xFFDCEBF7);

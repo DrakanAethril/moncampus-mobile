@@ -56,5 +56,11 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Utilisez Face ID pour déverrouiller votre session MonCampus.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Utilisée pour joindre une photo à un message.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Utilisée pour joindre une photo à un message.</string>
 </dict>
 </plist>

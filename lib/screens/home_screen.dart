@@ -12,6 +12,7 @@ import '../services/auth_service.dart';
 import '../services/quiz_live_service.dart';
 import '../services/timetable_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_header.dart';
 import 'quiz_live_join_screen.dart';
 
 /// Home tab (design 3a) - brand header, greeting, announcement banner, next-class card, today's
@@ -41,10 +42,28 @@ class _HomeScreenState extends State<HomeScreen> {
   QuizLiveActiveSession? _activeLiveSession;
   bool _loading = true;
 
-  static const _weekdayNames = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+  static const _weekdayNames = [
+    'lundi',
+    'mardi',
+    'mercredi',
+    'jeudi',
+    'vendredi',
+    'samedi',
+    'dimanche'
+  ];
   static const _monthNames = [
-    'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+    'janvier',
+    'février',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'août',
+    'septembre',
+    'octobre',
+    'novembre',
+    'décembre',
   ];
 
   @override
@@ -66,8 +85,12 @@ class _HomeScreenState extends State<HomeScreen> {
     // Independent widgets, independent failures - one card not loading shouldn't blank the
     // others (unlike TimetableScreen's single-source dependency).
     final results = await Future.wait([
-      _timetableService.fetchWeek(token, from: monday, to: sunday).catchError((_) => <LessonSession>[]),
-      _announcementService.fetchAnnouncements(token).catchError((_) => <Announcement>[]),
+      _timetableService
+          .fetchWeek(token, from: monday, to: sunday)
+          .catchError((_) => <LessonSession>[]),
+      _announcementService
+          .fetchAnnouncements(token)
+          .catchError((_) => <Announcement>[]),
       _agendaService.fetchEvents(token).catchError((_) => <AgendaEvent>[]),
       _quizLiveService.fetchActive(token).catchError((_) => null),
     ]);
@@ -75,7 +98,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     final today = DateTime(now.year, now.month, now.day);
-    final todaySessions = (results[0] as List<LessonSession>).where((session) => _isSameDay(session.day, today)).toList()
+    final todaySessions = (results[0] as List<LessonSession>)
+        .where((session) => _isSameDay(session.day, today))
+        .toList()
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
 
     setState(() {
@@ -87,7 +112,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  bool _isSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 
   LessonSession? get _nextSession {
     final sessions = _todaySessions;
@@ -112,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return SafeArea(
       child: Column(
         children: [
-          _buildHeader(user),
+          AppHeader(user: user),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _loadToday,
@@ -134,7 +160,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 14),
                   ],
                   _buildTodayCard(),
-                  if (_upcomingEvents != null && _upcomingEvents!.isNotEmpty) ...[
+                  if (_upcomingEvents != null &&
+                      _upcomingEvents!.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     _buildAgendaCard(_upcomingEvents!),
                   ],
@@ -147,56 +174,27 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeader(AppUser? user) {
-    return Container(
-      color: AppColors.navy,
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-            alignment: Alignment.center,
-            child: const Text('B', style: TextStyle(color: AppColors.brand, fontWeight: FontWeight.bold, fontSize: 16)),
-          ),
-          const SizedBox(width: 11),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Institution Beaupeyrat', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
-              Text('depuis 1634', style: TextStyle(color: Color(0xFF7D99B0), fontSize: 10, letterSpacing: .5)),
-            ],
-          ),
-          const Spacer(),
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: AppColors.gold,
-            child: Text(
-              user?.initials ?? '?',
-              style: const TextStyle(color: AppColors.navy, fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildGreeting(AppUser? user) {
     final now = DateTime.now();
-    final formatted = '${_weekdayNames[now.weekday - 1]} ${now.day} ${_monthNames[now.month - 1]}';
+    final formatted =
+        '${_weekdayNames[now.weekday - 1]} ${now.day} ${_monthNames[now.month - 1]}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           formatted.toUpperCase(),
-          style: const TextStyle(fontSize: 12, color: AppColors.faint, fontWeight: FontWeight.w600, letterSpacing: .5),
+          style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.faint,
+              fontWeight: FontWeight.w600,
+              letterSpacing: .5),
         ),
         const SizedBox(height: 2),
         Text(
           'Bonjour ${user?.firstname ?? user?.username ?? ''}',
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.navy),
+          style: const TextStyle(
+              fontSize: 22, fontWeight: FontWeight.w600, color: AppColors.navy),
         ),
       ],
     );
@@ -209,36 +207,60 @@ class _HomeScreenState extends State<HomeScreen> {
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => QuizLiveJoinScreen(sessionId: session.sessionId, quizName: session.name, hostName: session.hostName),
+          builder: (_) => QuizLiveJoinScreen(
+              sessionId: session.sessionId,
+              quizName: session.name,
+              hostName: session.hostName),
         ),
       ),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: AppColors.navy, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+            color: AppColors.navy, borderRadius: BorderRadius.circular(12)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Container(width: 9, height: 9, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
+                Container(
+                    width: 9,
+                    height: 9,
+                    decoration: const BoxDecoration(
+                        color: AppColors.gold, shape: BoxShape.circle)),
                 const SizedBox(width: 8),
                 const Text(
                   'CONCOURS EN COURS',
-                  style: TextStyle(color: AppColors.gold, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 2),
+                  style: TextStyle(
+                      color: AppColors.gold,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 2),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text(session.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 16)),
+            Text(session.name,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16)),
             const SizedBox(height: 3),
-            Text('Lancé par ${session.hostName}', style: const TextStyle(color: Color(0xFF9DB4C6), fontSize: 12.5)),
+            Text('Lancé par ${session.hostName}',
+                style:
+                    const TextStyle(color: Color(0xFF9DB4C6), fontSize: 12.5)),
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(color: AppColors.gold, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                  color: AppColors.gold,
+                  borderRadius: BorderRadius.circular(10)),
               alignment: Alignment.center,
-              child: const Text('Rejoindre le concours', style: TextStyle(color: AppColors.navy, fontWeight: FontWeight.bold, fontSize: 14)),
+              child: const Text('Rejoindre le concours',
+                  style: TextStyle(
+                      color: AppColors.navy,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14)),
             ),
           ],
         ),
@@ -250,7 +272,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [AppColors.gold, AppColors.goldStrong]),
+        gradient: const LinearGradient(
+            colors: [AppColors.gold, AppColors.goldStrong]),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -259,17 +282,25 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             width: 24,
             height: 24,
-            decoration: const BoxDecoration(color: AppColors.navy, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+                color: AppColors.navy, shape: BoxShape.circle),
             alignment: Alignment.center,
-            child: const Text('!', style: TextStyle(color: Color(0xFFE8C574), fontWeight: FontWeight.bold, fontSize: 12)),
+            child: const Text('!',
+                style: TextStyle(
+                    color: Color(0xFFE8C574),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12)),
           ),
           const SizedBox(width: 11),
           Expanded(
             child: RichText(
               text: TextSpan(
-                style: const TextStyle(fontSize: 13, height: 1.35, color: AppColors.navy),
+                style: const TextStyle(
+                    fontSize: 13, height: 1.35, color: AppColors.navy),
                 children: [
-                  TextSpan(text: announcement.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  TextSpan(
+                      text: announcement.title,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   const TextSpan(text: '  '),
                   TextSpan(text: announcement.plainTextBody.split('\n').first),
                 ],
@@ -287,7 +318,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [AppColors.navy, AppColors.brand]),
+        gradient:
+            const LinearGradient(colors: [AppColors.navy, AppColors.brand]),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -295,7 +327,11 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           const Text(
             'PROCHAIN COURS',
-            style: TextStyle(color: Color(0xFFBCD4E6), fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: .5),
+            style: TextStyle(
+                color: Color(0xFFBCD4E6),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                letterSpacing: .5),
           ),
           const SizedBox(height: 8),
           Row(
@@ -304,12 +340,16 @@ class _HomeScreenState extends State<HomeScreen> {
               Expanded(
                 child: Text(
                   session.title,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15),
                 ),
               ),
               Text(
                 [session.room, session.teacher].whereType<String>().join(' · '),
-                style: const TextStyle(color: Color(0xFFBCD4E6), fontSize: 12.5),
+                style:
+                    const TextStyle(color: Color(0xFFBCD4E6), fontSize: 12.5),
               ),
             ],
           ),
@@ -331,13 +371,20 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                const Text('Ma journée', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.ink)),
+                const Text('Ma journée',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: AppColors.ink)),
                 const Spacer(),
                 GestureDetector(
                   onTap: widget.onViewTimetable,
                   child: const Text(
                     'Emploi du temps →',
-                    style: TextStyle(color: AppColors.brand, fontWeight: FontWeight.w600, fontSize: 12),
+                    style: TextStyle(
+                        color: AppColors.brand,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12),
                   ),
                 ),
               ],
@@ -345,16 +392,20 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const Divider(height: 1),
           if (_loading)
-            const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
+            const Padding(
+                padding: EdgeInsets.all(20),
+                child: Center(child: CircularProgressIndicator()))
           else if (_todaySessions == null || _todaySessions!.isEmpty)
             const Padding(
               padding: EdgeInsets.all(16),
-              child: Text('Aucun cours aujourd\'hui.', style: TextStyle(color: AppColors.faint)),
+              child: Text('Aucun cours aujourd\'hui.',
+                  style: TextStyle(color: AppColors.faint)),
             )
           else
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(children: _todaySessions!.map(_buildSessionRow).toList()),
+              child: Column(
+                  children: _todaySessions!.map(_buildSessionRow).toList()),
             ),
         ],
       ),
@@ -379,18 +430,29 @@ class _HomeScreenState extends State<HomeScreen> {
               width: 74,
               child: Text(
                 '${session.startTime}–${session.endTime}',
-                style: TextStyle(fontFamily: 'monospace', fontWeight: FontWeight.w600, fontSize: 11.5, color: color),
+                style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11.5,
+                    color: color),
               ),
             ),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(session.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.ink)),
+                  Text(session.title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: AppColors.ink)),
                   if (session.room != null || session.teacher != null)
                     Text(
-                      [session.room, session.teacher].whereType<String>().join(' · '),
-                      style: const TextStyle(fontSize: 11, color: AppColors.muted),
+                      [session.room, session.teacher]
+                          .whereType<String>()
+                          .join(' · '),
+                      style:
+                          const TextStyle(fontSize: 11, color: AppColors.muted),
                     ),
                 ],
               ),
@@ -416,13 +478,20 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                const Text('Agenda', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.ink)),
+                const Text('Agenda',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: AppColors.ink)),
                 const Spacer(),
                 GestureDetector(
                   onTap: widget.onViewAgenda,
                   child: const Text(
                     'Tout voir →',
-                    style: TextStyle(color: AppColors.brand, fontWeight: FontWeight.w600, fontSize: 12),
+                    style: TextStyle(
+                        color: AppColors.brand,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12),
                   ),
                 ),
               ],
@@ -431,7 +500,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Column(children: preview.map(_buildAgendaPreviewRow).toList()),
+            child:
+                Column(children: preview.map(_buildAgendaPreviewRow).toList()),
           ),
         ],
       ),
@@ -447,11 +517,21 @@ class _HomeScreenState extends State<HomeScreen> {
           Container(
             width: 40,
             padding: const EdgeInsets.symmetric(vertical: 3),
-            decoration: BoxDecoration(color: AppColors.goldBg, borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(
+                color: AppColors.goldBg,
+                borderRadius: BorderRadius.circular(8)),
             child: Column(
               children: [
-                Text(_weekdayAbbrev(event.startAt), style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.goldTx)),
-                Text('${event.startAt.day}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.goldTx)),
+                Text(_weekdayAbbrev(event.startAt),
+                    style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.goldTx)),
+                Text('${event.startAt.day}',
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.goldTx)),
               ],
             ),
           ),
@@ -460,9 +540,15 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(event.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.ink)),
+                Text(event.title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: AppColors.ink)),
                 Text(
-                  [_formatTime(event.startAt), event.location].whereType<String>().join(' · '),
+                  [_formatTime(event.startAt), event.location]
+                      .whereType<String>()
+                      .join(' · '),
                   style: const TextStyle(fontSize: 11, color: AppColors.muted),
                 ),
               ],
@@ -473,7 +559,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _weekdayAbbrev(DateTime date) => const ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'][date.weekday - 1];
+  String _weekdayAbbrev(DateTime date) =>
+      const ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'][date.weekday - 1];
 
   String _formatTime(DateTime dateTime) =>
       '${dateTime.hour.toString().padLeft(2, '0')}h${dateTime.minute.toString().padLeft(2, '0')}';

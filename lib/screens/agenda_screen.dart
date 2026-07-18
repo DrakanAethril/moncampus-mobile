@@ -5,6 +5,7 @@ import '../models/agenda_event.dart';
 import '../services/agenda_service.dart';
 import '../services/auth_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/app_header.dart';
 
 /// Agenda tab (design 3d) - events grouped by day, upcoming/past toggle. Now backed by the real
 /// AgendaEvent/SignupList backend features (App\Controller\Api\AgendaController) - see
@@ -29,10 +30,28 @@ class _AgendaScreenState extends State<AgendaScreen> {
   bool _loading = true;
   String? _error;
 
-  static const _weekdayAbbrev = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+  static const _weekdayAbbrev = [
+    'lun',
+    'mar',
+    'mer',
+    'jeu',
+    'ven',
+    'sam',
+    'dim'
+  ];
   static const _monthNames = [
-    'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-    'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+    'janvier',
+    'février',
+    'mars',
+    'avril',
+    'mai',
+    'juin',
+    'juillet',
+    'août',
+    'septembre',
+    'octobre',
+    'novembre',
+    'décembre',
   ];
 
   @override
@@ -89,14 +108,18 @@ class _AgendaScreenState extends State<AgendaScreen> {
         onSignupListChanged: (updated) {
           if (!mounted) return;
           setState(() {
-            _events = _events?.map((e) => e.id == event.id ? _withSignupList(e, updated) : e).toList();
+            _events = _events
+                ?.map((e) => e.id == event.id ? _withSignupList(e, updated) : e)
+                .toList();
           });
         },
       ),
     );
   }
 
-  AgendaEvent _withSignupList(AgendaEvent event, SignupListSummary signupList) => AgendaEvent(
+  AgendaEvent _withSignupList(
+          AgendaEvent event, SignupListSummary signupList) =>
+      AgendaEvent(
         id: event.id,
         title: event.title,
         description: event.description,
@@ -109,10 +132,12 @@ class _AgendaScreenState extends State<AgendaScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthService>().currentUser;
+
     return SafeArea(
       child: Column(
         children: [
-          _buildHeader(),
+          AppHeader(user: user, child: _buildToggleRow()),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _load,
@@ -124,30 +149,30 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
-  Widget _buildHeader() {
-    return Container(
-      color: AppColors.navy,
-      padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
-      child: Row(
-        children: [
-          const Text('Agenda', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 17)),
-          const Spacer(),
-          Container(
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.white.withOpacity(0.25)),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildTabChip('À venir', !_showPast),
-                _buildTabChip('Passés', _showPast),
-              ],
-            ),
+  Widget _buildToggleRow() {
+    return Row(
+      children: [
+        const Text('Agenda',
+            style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 17)),
+        const Spacer(),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.white.withOpacity(0.25)),
+            borderRadius: BorderRadius.circular(8),
           ),
-        ],
-      ),
+          clipBehavior: Clip.antiAlias,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildTabChip('À venir', !_showPast),
+              _buildTabChip('Passés', _showPast),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -179,7 +204,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(24),
-            child: Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.redTx)),
+            child: Text(_error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.redTx)),
           ),
         ],
       );
@@ -194,7 +221,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
             padding: const EdgeInsets.all(32),
             child: Center(
               child: Text(
-                _showPast ? 'Aucun événement passé.' : 'Aucun événement à venir.',
+                _showPast
+                    ? 'Aucun événement passé.'
+                    : 'Aucun événement à venir.',
                 style: const TextStyle(color: AppColors.faint),
               ),
             ),
@@ -208,7 +237,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
       itemCount: events.length,
       itemBuilder: (context, index) {
         final event = events[index];
-        final isFirstOfDay = index == 0 || !_isSameDay(events[index - 1].startAt, event.startAt);
+        final isFirstOfDay =
+            index == 0 || !_isSameDay(events[index - 1].startAt, event.startAt);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -224,7 +254,8 @@ class _AgendaScreenState extends State<AgendaScreen> {
     );
   }
 
-  bool _isSameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 
   Widget _buildDateHeader(DateTime date, bool addTopSpacing) {
     return Padding(
@@ -232,7 +263,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
       child: Text(
         '${_weekdayAbbrev[date.weekday - 1][0].toUpperCase()}${_weekdayAbbrev[date.weekday - 1].substring(1)} '
         '${date.day} ${_monthNames[date.month - 1]}',
-        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.faint, letterSpacing: .5),
+        style: const TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.faint,
+            letterSpacing: .5),
       ),
     );
   }
@@ -257,15 +292,22 @@ class _AgendaScreenState extends State<AgendaScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(event.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5, color: AppColors.ink)),
+                  Text(event.title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14.5,
+                          color: AppColors.ink)),
                   const SizedBox(height: 2),
-                  Text(_timeAndLocation(event), style: const TextStyle(fontSize: 12, color: AppColors.muted)),
+                  Text(_timeAndLocation(event),
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.muted)),
                   const SizedBox(height: 7),
                   Wrap(
                     spacing: 6,
                     runSpacing: 4,
                     children: [
-                      _buildBadge(event.audienceLabel, AppColors.blueBg, AppColors.blueTx),
+                      _buildBadge(event.audienceLabel, AppColors.blueBg,
+                          AppColors.blueTx),
                       if (event.signupList != null)
                         _buildBadge(
                           '${event.signupList!.registrationCount} inscrit${event.signupList!.registrationCount > 1 ? 's' : ''}',
@@ -295,8 +337,16 @@ class _AgendaScreenState extends State<AgendaScreen> {
       ),
       child: Column(
         children: [
-          Text(_weekdayAbbrev[date.weekday - 1], style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.goldTx)),
-          Text('${date.day}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.goldTx)),
+          Text(_weekdayAbbrev[date.weekday - 1],
+              style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.goldTx)),
+          Text('${date.day}',
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.goldTx)),
         ],
       ),
     );
@@ -305,8 +355,11 @@ class _AgendaScreenState extends State<AgendaScreen> {
   Widget _buildBadge(String label, Color background, Color foreground) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(8)),
-      child: Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: foreground)),
+      decoration: BoxDecoration(
+          color: background, borderRadius: BorderRadius.circular(8)),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 10.5, fontWeight: FontWeight.w600, color: foreground)),
     );
   }
 
@@ -328,7 +381,10 @@ class _AgendaScreenState extends State<AgendaScreen> {
 /// the sheet to close (see AgendaScreen._openEvent's docblock for why this isn't a pop-return
 /// value instead).
 class _AgendaEventSheet extends StatefulWidget {
-  const _AgendaEventSheet({required this.event, required this.agendaService, required this.onSignupListChanged});
+  const _AgendaEventSheet(
+      {required this.event,
+      required this.agendaService,
+      required this.onSignupListChanged});
 
   final AgendaEvent event;
   final AgendaService agendaService;
@@ -375,22 +431,31 @@ class _AgendaEventSheetState extends State<_AgendaEventSheet> {
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.fromLTRB(
+          20, 20, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(event.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18, color: AppColors.ink)),
+            Text(event.title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 18,
+                    color: AppColors.ink)),
             const SizedBox(height: 6),
-            Text(_fullDateTime(event), style: const TextStyle(fontSize: 13, color: AppColors.muted)),
+            Text(_fullDateTime(event),
+                style: const TextStyle(fontSize: 13, color: AppColors.muted)),
             if (event.location != null) ...[
               const SizedBox(height: 2),
-              Text(event.location!, style: const TextStyle(fontSize: 13, color: AppColors.muted)),
+              Text(event.location!,
+                  style: const TextStyle(fontSize: 13, color: AppColors.muted)),
             ],
             if (event.description != null && event.description!.isNotEmpty) ...[
               const SizedBox(height: 14),
-              Text(event.description!, style: const TextStyle(fontSize: 14, color: AppColors.text, height: 1.4)),
+              Text(event.description!,
+                  style: const TextStyle(
+                      fontSize: 14, color: AppColors.text, height: 1.4)),
             ],
             if (_signupList != null) ...[
               const SizedBox(height: 16),
@@ -410,25 +475,36 @@ class _AgendaEventSheetState extends State<_AgendaEventSheet> {
       children: [
         Row(
           children: [
-            const Icon(Icons.how_to_reg_outlined, size: 18, color: AppColors.brand),
+            const Icon(Icons.how_to_reg_outlined,
+                size: 18, color: AppColors.brand),
             const SizedBox(width: 8),
             Text(
               '${signupList.registrationCount} inscrit${signupList.registrationCount > 1 ? 's' : ''}',
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.ink),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: AppColors.ink),
             ),
             if (!signupList.registrationOpen) ...[
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(8)),
-                child: const Text('Inscriptions closes', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: AppColors.muted)),
+                decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(8)),
+                child: const Text('Inscriptions closes',
+                    style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.muted)),
               ),
             ],
           ],
         ),
         if (_error != null) ...[
           const SizedBox(height: 8),
-          Text(_error!, style: const TextStyle(fontSize: 12.5, color: AppColors.redTx)),
+          Text(_error!,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.redTx)),
         ],
         if (signupList.canRegister || signupList.canUnregister) ...[
           const SizedBox(height: 12),
@@ -438,14 +514,23 @@ class _AgendaEventSheetState extends State<_AgendaEventSheet> {
                 ? ElevatedButton(
                     onPressed: _submitting ? null : _toggleRegistration,
                     child: _submitting
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
                         : const Text("S'inscrire"),
                   )
                 : OutlinedButton(
                     onPressed: _submitting ? null : _toggleRegistration,
-                    style: OutlinedButton.styleFrom(foregroundColor: AppColors.redTx, side: const BorderSide(color: AppColors.border)),
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.redTx,
+                        side: const BorderSide(color: AppColors.border)),
                     child: _submitting
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2))
                         : const Text('Se désinscrire'),
                   ),
           ),
@@ -455,8 +540,10 @@ class _AgendaEventSheetState extends State<_AgendaEventSheet> {
   }
 
   String _fullDateTime(AgendaEvent event) {
-    final date = '${event.startAt.day.toString().padLeft(2, '0')}/${event.startAt.month.toString().padLeft(2, '0')}/${event.startAt.year}';
-    final start = '${event.startAt.hour.toString().padLeft(2, '0')}h${event.startAt.minute.toString().padLeft(2, '0')}';
+    final date =
+        '${event.startAt.day.toString().padLeft(2, '0')}/${event.startAt.month.toString().padLeft(2, '0')}/${event.startAt.year}';
+    final start =
+        '${event.startAt.hour.toString().padLeft(2, '0')}h${event.startAt.minute.toString().padLeft(2, '0')}';
     final end = event.endAt != null
         ? ' – ${event.endAt!.hour.toString().padLeft(2, '0')}h${event.endAt!.minute.toString().padLeft(2, '0')}'
         : '';
