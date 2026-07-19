@@ -171,30 +171,30 @@ class _ComposeMessageScreenState extends State<ComposeMessageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppNavBar(
-        title: 'Nouveau message',
-        leading: GestureDetector(
-          onTap: () => Navigator.of(context).pop(false),
-          child: const Text('Annuler',
-              style: TextStyle(
-                  color: Color(0xFFBCD4E6),
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5)),
-        ),
-        trailing: GestureDetector(
-          onTap: _sending ? null : _send,
-          child: Text(
-            'Envoyer',
-            style: TextStyle(
-                color: _sending ? AppColors.faint : AppColors.gold,
-                fontWeight: FontWeight.bold,
-                fontSize: 13.5),
-          ),
-        ),
-      ),
       body: SafeArea(
         child: Column(
           children: [
+            AppNavBar(
+              title: 'Nouveau message',
+              leading: GestureDetector(
+                onTap: () => Navigator.of(context).pop(false),
+                child: const Text('Annuler',
+                    style: TextStyle(
+                        color: Color(0xFFBCD4E6),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5)),
+              ),
+              trailing: GestureDetector(
+                onTap: _sending ? null : _send,
+                child: Text(
+                  'Envoyer',
+                  style: TextStyle(
+                      color: _sending ? AppColors.faint : AppColors.gold,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13.5),
+                ),
+              ),
+            ),
             if (_error != null)
               Container(
                 width: double.infinity,

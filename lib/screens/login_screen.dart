@@ -289,8 +289,15 @@ class _LoginScreenState extends State<LoginScreen> {
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
+        // Unlike the default `center`, this must stretch full-width like _buildForm()'s card -
+        // without it, the Container/Column both shrink-wrap to their widest child's intrinsic
+        // width (the button/text), so the whole card renders as a small box instead of filling
+        // the screen like every other card on this page.
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(Icons.fingerprint, size: 46, color: AppColors.brand),
+          const Center(
+            child: Icon(Icons.fingerprint, size: 46, color: AppColors.brand),
+          ),
           const SizedBox(height: 12),
           Text(
             'Session verrouillée pour ${_usernameOrGeneric()}',
@@ -303,6 +310,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 18),
           if (_errorMessage != null) ...[
             Text(_errorMessage!,
+                textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.redTx, fontSize: 12.5)),
             const SizedBox(height: 12),
           ],

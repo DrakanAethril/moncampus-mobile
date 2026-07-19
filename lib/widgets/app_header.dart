@@ -137,16 +137,20 @@ class AppHeaderTitleRow extends StatelessWidget {
 /// row entirely rather than stack it under yet another header, matching the reference mockups
 /// (unlike 3g/3j/3k's profile screens, which are only one level deep and keep the brand row via
 /// [AppHeader]).
-class AppNavBar extends StatelessWidget implements PreferredSizeWidget {
+///
+/// A plain widget, not a `Scaffold.appBar:` - that slot lays a `PreferredSizeWidget` out from
+/// y=0 using only its own `preferredSize` for height, with no awareness of the status bar, so a
+/// fixed-height custom bar there ends up partly hidden underneath it (its content clipped by the
+/// system status bar - this bit the "Envoyer"/back-chevron rows before). Used instead as an
+/// ordinary child inside the screen's own `SafeArea`, same as [AppHeader] everywhere else in the
+/// app, so it's pushed down by the real inset instead of a guessed one.
+class AppNavBar extends StatelessWidget {
   const AppNavBar(
       {super.key, required this.title, this.leading, this.trailing});
 
   final String title;
   final Widget? leading;
   final Widget? trailing;
-
-  @override
-  Size get preferredSize => const Size.fromHeight(52);
 
   @override
   Widget build(BuildContext context) {
