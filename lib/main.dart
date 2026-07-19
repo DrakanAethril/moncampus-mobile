@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/login_screen.dart';
@@ -7,6 +8,18 @@ import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
 
 void main() {
+  // Every screen has a dark navy/blue region at the very top (AppHeader's navy bar, or the
+  // login gradient) - without this, Android/iOS default to an opaque status bar (often black)
+  // that doesn't match, instead of letting the app's own background show through with light
+  // (white) status bar icons/clock.
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+    ),
+  );
+
   runApp(
     ChangeNotifierProvider(
       create: (_) => AuthService()..tryAutoLogin(),

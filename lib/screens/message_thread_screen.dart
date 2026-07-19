@@ -101,21 +101,27 @@ class _MessageThreadScreenState extends State<MessageThreadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppNavBar(
-        title: widget.subject,
-        leading: GestureDetector(
-          onTap: () => Navigator.of(context).pop(),
-          child: const Padding(
-            padding: EdgeInsets.only(right: 10),
-            child: Text('‹',
-                style: TextStyle(
-                    fontSize: 19,
-                    color: Color(0xFFCFDDE9),
-                    fontWeight: FontWeight.w600)),
-          ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            AppNavBar(
+              title: widget.subject,
+              leading: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: const Padding(
+                  padding: EdgeInsets.only(right: 10),
+                  child: Text('‹',
+                      style: TextStyle(
+                          fontSize: 19,
+                          color: Color(0xFFCFDDE9),
+                          fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ),
+            Expanded(child: _buildBody()),
+          ],
         ),
       ),
-      body: _buildBody(),
       bottomNavigationBar:
           _thread?.canReply ?? false ? _buildActionBar() : null,
     );
