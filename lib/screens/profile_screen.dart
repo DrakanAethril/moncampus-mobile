@@ -22,7 +22,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   final _newEmailController = TextEditingController();
   final _replacementEmailController = TextEditingController();
-  final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -37,7 +36,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _newEmailController.dispose();
     _replacementEmailController.dispose();
-    _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -110,7 +108,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       await _profileService.changePassword(
         token,
-        currentPassword: _currentPasswordController.text,
         newPassword: _newPasswordController.text,
         newPasswordConfirmation: _confirmPasswordController.text,
       );
@@ -118,7 +115,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _passwordSuccess =
               'Votre demande a été enregistrée. Le nouveau mot de passe sera actif sous peu.';
-          _currentPasswordController.clear();
           _newPasswordController.clear();
           _confirmPasswordController.clear();
         });
@@ -509,12 +505,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       const SizedBox(height: 10),
       _note(
           '12 caractères min., majuscule, minuscule, chiffre et caractère spécial.'),
-      const SizedBox(height: 10),
-      TextField(
-        controller: _currentPasswordController,
-        obscureText: true,
-        decoration: const InputDecoration(labelText: 'Mot de passe actuel'),
-      ),
       const SizedBox(height: 10),
       TextField(
         controller: _newPasswordController,

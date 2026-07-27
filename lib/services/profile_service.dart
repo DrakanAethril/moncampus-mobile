@@ -50,7 +50,6 @@ class ProfileService {
 
   Future<void> changePassword(
     String token, {
-    required String currentPassword,
     required String newPassword,
     required String newPasswordConfirmation,
   }) async {
@@ -58,7 +57,6 @@ class ProfileService {
       Uri.parse('${ApiConfig.baseUrl}/api/profile/change-password'),
       headers: _headers(token),
       body: jsonEncode({
-        'currentPassword': currentPassword,
         'newPassword': newPassword,
         'newPasswordConfirmation': newPasswordConfirmation,
       }),
@@ -80,7 +78,6 @@ class ProfileService {
         'no_pending_email' => 'Aucune adresse en attente de validation.',
         'resend_too_soon' =>
           'Un email a déjà été envoyé récemment, merci de patienter.',
-        'current_password_incorrect' => 'Le mot de passe actuel est incorrect.',
         'new_password_contains_username' =>
           'Le nouveau mot de passe ne doit pas contenir votre identifiant.',
         _ => fallback,
