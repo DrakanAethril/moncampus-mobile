@@ -1,13 +1,21 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/login_screen.dart';
+import 'screens/magic_link_landing_screen.dart';
 import 'screens/main_shell.dart';
 import 'services/auth_service.dart';
 import 'theme/app_theme.dart';
+import 'widgets/brand.dart';
 
 void main() {
+  // Spectral / Source Sans 3 are bundled under assets/google_fonts/ - see AppTheme's docblock.
+  AppTheme.disableFontFetching();
+
   // Every screen has a dark navy/blue region at the very top (AppHeader's navy bar, or the
   // login gradient) - without this, Android/iOS default to an opaque status bar (often black)
   // that doesn't match, instead of letting the app's own background show through with light
@@ -31,32 +39,108 @@ void main() {
 class MonCampusApp extends StatelessWidget {
   const MonCampusApp({super.key});
 
+  /// Pushing the magic-link landing screen needs a navigator that is not the one being built.
+  static final navigatorKey = GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'moncampus',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      navigatorKey: navigatorKey,
       home: const AuthGate(),
     );
   }
 }
 
-/// Switches between LoginScreen and MainShell (the 5-tab bottom nav) based on AuthService's
+/// Switches between LoginScreen and MainShell (the 4-tab bottom nav) based on AuthService's
 /// state, so nothing else in the widget tree has to think about auth/navigation itself.
-class AuthGate extends StatelessWidget {
+///
+/// Also the app's deep-link listener: `campusmanager://login/<token>` (design_handoff_mobile, tour
+/// 6) pushes the landing screen, which trades the token for a session. Listening here rather than
+/// in main() means the navigator already exists when a link arrives, including the one that cold
+/// started the app.
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  final _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _linkSubscription = _appLinks.uriLinkStream.listen(_handleLink);
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _handleLink(Uri uri) {
+    if (uri.scheme != 'campusmanager' || uri.host != 'login') return;
+
+    final token = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
+    if (token.isEmpty) return;
+
+    // Back to the root first: a second link (a resend, a link opened twice) must replace the
+    // landing screen, not stack another one on top of it.
+    final navigator = MonCampusApp.navigatorKey.currentState;
+    navigator?.popUntil((route) => route.isFirst);
+    navigator?.push(MaterialPageRoute(
+      builder: (_) => MagicLinkLandingScreen(token: token),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
 
     if (auth.isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const LaunchScreen();
     }
 
     return auth.isAuthenticated ? const MainShell() : const LoginScreen();
+  }
+}
+
+/// The app's own first frame (design_handoff_mobile 4f): medallion and logotype on navy, nothing
+/// else. Identical to the native splash the system paints before the engine is up, so the handover
+/// between the two is invisible.
+class LaunchScreen extends StatelessWidget {
+  const LaunchScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: AppColors.navy,
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            BrandMedallion(
+              size: 112,
+              ringWidth: 5,
+              shadow: [
+                BoxShadow(
+                  color: Color(0x66000000),
+                  blurRadius: 40,
+                  offset: Offset(0, 16),
+                ),
+              ],
+            ),
+            SizedBox(height: 18),
+            BrandWordmark.hero(),
+          ],
+        ),
+      ),
+    );
   }
 }

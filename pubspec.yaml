@@ -42,6 +42,20 @@ dependencies:
   local_auth: ^2.3.0
   file_picker: ^8.1.4
   image_picker: ^1.1.2
+  # Spectral (titles) + Source Sans 3 (text) - the handoff's type system. The .ttf files are
+  # bundled under assets/google_fonts/ and runtime fetching is disabled in main(), so the app
+  # never depends on fonts.gstatic.com being reachable from a school network.
+  google_fonts: ^6.2.1
+  # The handoff's icons are lucide-style strokes, not Material glyphs: they are rendered from the
+  # exact SVG paths of the creas (lib/theme/app_icons.dart) so stroke width and geometry match.
+  flutter_svg: ^2.0.10
+  # Magic-link deep links (campusmanager://login/<token>) - screens 6c/6d.
+  app_links: ^6.1.4
+  # Courrier école attachments: they are served behind the API's Bearer auth, so they are
+  # downloaded in-app to a temp file (path_provider) and handed to the OS viewer (open_filex)
+  # instead of being opened in an external browser like the travaux' public links.
+  path_provider: ^2.1.4
+  open_filex: ^4.5.0
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +84,10 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/brand/
+    # Picked up by google_fonts as pre-bundled families (no `fonts:` entry, that is how the
+    # package expects them) - see the dependency comment above.
+    - assets/google_fonts/
     - assets/icons/moncampus/ic_launcher_48.png
     - assets/icons/moncampus/ic_launcher_72.png
     - assets/icons/moncampus/ic_launcher_96.png
@@ -102,26 +120,27 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
 
-# Icône 6c « Bleu & or » (design/design_campus_manager reference/e-CO.dc.html, écran 6f) -
-# adaptive_icon_background/foreground/monochrome cover Android 8+ adaptive icons + the Android
-# 13+ themed monochrome layer; flutter_launcher_icons also (re)generates the legacy mipmap-*
-# fallback PNGs for API <26 from image_path.
+# App icon of design_handoff_mobile 4f: navy tile, medallion centred (assets generated from
+# assets/brand/embleme-white.png). adaptive_icon_background/foreground/monochrome cover Android 8+
+# adaptive icons + the Android 13+ themed monochrome layer; flutter_launcher_icons also
+# (re)generates the legacy mipmap-* fallback PNGs for API <26 from image_path.
 flutter_launcher_icons:
   android: true
   ios: false
   image_path: "assets/icons/moncampus/ic_launcher_192.png"
-  adaptive_icon_background: "#1B6BA8"
+  adaptive_icon_background: "#12344D"
   adaptive_icon_foreground: "assets/icons/moncampus/adaptive_foreground_432.png"
   adaptive_icon_monochrome: "assets/icons/moncampus/adaptive_monochrome_432.png"
 
-# Splash (écran 6h) - Android 12+'s native SplashScreen API draws $color + $image before the
-# Flutter engine is even up; the app's own first frame should repeat the same blue/badge/wordmark
-# so the transition from system window to Flutter UI is seamless.
+# Launch screen of design_handoff_mobile 4f - Android 12+'s native SplashScreen API draws $color +
+# $image before the Flutter engine is even up; the app's own first frame (LaunchScreen in main.dart)
+# repeats the same navy/medallion/logotype so the transition from system window to Flutter UI is
+# seamless.
 flutter_native_splash:
-  color: "#1B6BA8"
+  color: "#12344D"
   image: "assets/icons/moncampus/splash_icon.png"
   android_12:
-    color: "#1B6BA8"
+    color: "#12344D"
     image: "assets/icons/moncampus/splash_icon.png"
   android: true
   ios: false

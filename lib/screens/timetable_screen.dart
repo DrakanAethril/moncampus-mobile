@@ -6,7 +6,7 @@ import '../services/auth_service.dart';
 import '../services/timetable_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_header.dart';
-import 'home_screen.dart' show parseHexColor;
+import '../utils/hex_color.dart';
 
 /// Timetable tab (design 3c) - week day selector + the selected day's sessions. Fetches the whole
 /// week once (TimetableController already returns a date range) and filters client-side per tap,
@@ -125,7 +125,9 @@ class _TimetableScreenState extends State<TimetableScreen> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthService>().currentUser;
 
+    // top: false - AppHeader applies the status bar inset itself (see its docblock).
     return SafeArea(
+      top: false,
       child: Column(
         children: [
           AppHeader(user: user, child: _buildWeekSelector()),

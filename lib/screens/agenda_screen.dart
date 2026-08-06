@@ -134,7 +134,9 @@ class _AgendaScreenState extends State<AgendaScreen> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthService>().currentUser;
 
+    // top: false - AppHeader applies the status bar inset itself (see its docblock).
     return SafeArea(
+      top: false,
       child: Column(
         children: [
           AppHeader(user: user, child: _buildToggleRow()),
