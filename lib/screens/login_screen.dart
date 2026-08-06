@@ -2,8 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../services/auth_service.dart';
+import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
+import '../widgets/brand.dart';
+import 'magic_login_screen.dart';
 
+/// Connexion (design_handoff_mobile 4e): the medallion and the logotype on the navy-to-blue
+/// gradient, then the identifiant / mot de passe card, "Mot de passe oublié ?" opening the magic
+/// link flow (tour 6), and the biometric mention in the footer.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -56,6 +62,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Never named "Face ID" or "Touch ID" - the wording stays generic whatever the device offers
+  /// (handoff, principe 8).
   Future<void> _maybeOfferBiometrics(AuthService auth) async {
     if (!_rememberMe || auth.biometricEnabled || !await auth.canUseBiometrics) {
       return;
@@ -65,16 +73,26 @@ class _LoginScreenState extends State<LoginScreen> {
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Connexion biométrique'),
-        content: const Text(
-            'Utiliser Face ID / empreinte pour déverrouiller MonCampus la prochaine fois ?'),
+        title: Text('Connexion biométrique',
+            style: AppFont.spectral(size: 17, color: AppColors.navy)),
+        content: Text(
+          "Activez la connexion biométrique pour ouvrir l'app sans mot de passe la prochaine fois.",
+          style: AppFont.sans(size: 13, color: AppColors.muted, height: 1.6),
+        ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Non merci')),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('Plus tard',
+                style: AppFont.sans(size: 13, color: AppColors.faint)),
+          ),
           TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Activer')),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('Activer',
+                style: AppFont.sans(
+                    size: 13,
+                    weight: FontWeight.w600,
+                    color: AppColors.brandStrong)),
+          ),
         ],
       ),
     );
@@ -84,152 +102,84 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _showForgotPasswordHelp() {
-    showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Mot de passe oublié ?'),
-        content: const Text(
-            "Contactez le secrétariat de l'établissement au 05 55 45 81 00 pour réinitialiser votre mot de passe."),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Fermer'))
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
 
     return Scaffold(
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.navy,
-              AppColors.brand,
-              AppColors.bg,
-              AppColors.bg
-            ],
-            stops: [0, 0.42, 0.55, 1],
-          ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
-            child: Column(
-              children: [
-                const SizedBox(height: 44),
-                _buildBrand(),
-                const SizedBox(height: 30),
-                if (auth.hasPendingBiometricUnlock)
-                  _buildBiometricUnlock(auth)
-                else
-                  _buildForm(),
-                const SizedBox(height: 16),
-                const Text(
-                  "Besoin d'aide ? 05 55 45 81 00",
-                  style: TextStyle(fontSize: 11.5, color: AppColors.faint),
-                ),
-              ],
+      body: BrandHero(
+        footer: const _BiometricMention(),
+        child: Column(
+          children: [
+            if (auth.hasPendingBiometricUnlock)
+              _buildBiometricUnlock(auth)
+            else
+              _buildForm(),
+            const SizedBox(height: 16),
+            Text(
+              "Besoin d'aide ? 05 55 45 81 00",
+              style: AppFont.sans(size: 11.5, color: AppColors.faint),
             ),
-          ),
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildBrand() {
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: Image.asset('assets/icons/moncampus/ic_launcher_144.png',
-              width: 76, height: 76),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'Institution Beaupeyrat',
-          style: TextStyle(
-              color: Colors.white, fontWeight: FontWeight.w600, fontSize: 20),
-        ),
-        const SizedBox(height: 3),
-        const Text(
-          'DEPUIS 1634',
-          style: TextStyle(
-              color: Color(0xFFBCD4E6), fontSize: 11.5, letterSpacing: 1.5),
-        ),
-      ],
     );
   }
 
   Widget _buildForm() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-              color: AppColors.navy.withOpacity(0.14),
-              blurRadius: 34,
-              offset: const Offset(0, 14))
-        ],
-      ),
+    return BrandCard(
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (_errorMessage != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.redBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(_errorMessage!,
-                    style: const TextStyle(color: AppColors.redTx)),
-              ),
-              const SizedBox(height: 16),
+              _ErrorBox(message: _errorMessage!),
+              const SizedBox(height: 15),
             ],
-            TextFormField(
-              controller: _usernameController,
-              decoration: const InputDecoration(labelText: 'Identifiant'),
-              textInputAction: TextInputAction.next,
-              autocorrect: false,
-              enableSuggestions: false,
-              validator: (value) => (value == null || value.trim().isEmpty)
-                  ? 'Identifiant requis'
-                  : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _passwordController,
-              decoration: InputDecoration(
-                labelText: 'Mot de passe',
-                suffixIcon: IconButton(
-                  icon: Icon(_obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined),
-                  onPressed: () =>
-                      setState(() => _obscurePassword = !_obscurePassword),
-                ),
+            _Field(
+              label: 'Identifiant',
+              child: TextFormField(
+                controller: _usernameController,
+                decoration: _inputDecoration(),
+                style: AppFont.sans(size: 14.5, color: AppColors.ink),
+                textInputAction: TextInputAction.next,
+                autocorrect: false,
+                enableSuggestions: false,
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'Identifiant requis'
+                    : null,
               ),
-              obscureText: _obscurePassword,
-              textInputAction: TextInputAction.done,
-              onFieldSubmitted: (_) => _submit(),
-              validator: (value) => (value == null || value.isEmpty)
-                  ? 'Mot de passe requis'
-                  : null,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 15),
+            _Field(
+              label: 'Mot de passe',
+              child: TextFormField(
+                controller: _passwordController,
+                decoration: _inputDecoration(
+                  suffix: GestureDetector(
+                    onTap: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: AppIcon(
+                        _obscurePassword ? AppIcons.eye : AppIcons.eyeOff,
+                        size: 17,
+                        color: AppColors.faint,
+                      ),
+                    ),
+                  ),
+                ),
+                style: AppFont.sans(size: 14.5, color: AppColors.ink),
+                obscureText: _obscurePassword,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _submit(),
+                validator: (value) => (value == null || value.isEmpty)
+                    ? 'Mot de passe requis'
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 15),
             Row(
               children: [
                 GestureDetector(
@@ -237,33 +187,28 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Checkbox(
-                        value: _rememberMe,
-                        onChanged: (value) =>
-                            setState(() => _rememberMe = value ?? true),
-                        activeColor: AppColors.brand,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      const Text('Rester connecté',
+                      _Checkbox(checked: _rememberMe),
+                      const SizedBox(width: 8),
+                      Text('Rester connecté',
                           style:
-                              TextStyle(fontSize: 13, color: AppColors.text)),
+                              AppFont.sans(size: 13, color: AppColors.text)),
                     ],
                   ),
                 ),
                 const Spacer(),
                 GestureDetector(
-                  onTap: _showForgotPasswordHelp,
-                  child: const Text(
+                  onTap: _openMagicLink,
+                  child: Text(
                     'Mot de passe oublié ?',
-                    style: TextStyle(
-                        color: AppColors.brand,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12.5),
+                    style: AppFont.sans(
+                        size: 12.5,
+                        weight: FontWeight.w600,
+                        color: AppColors.brand),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 15),
             ElevatedButton(
               onPressed: _isSubmitting ? null : _submit,
               child: _isSubmitting
@@ -280,59 +225,62 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// "Mot de passe oublié ?" never resets a password (principe 7): it opens the passwordless
+  /// login by mailed link (6a).
+  void _openMagicLink() {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => const MagicLoginScreen(),
+    ));
+  }
+
   Widget _buildBiometricUnlock(AuthService auth) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
+    return BrandCard(
+      padding: const EdgeInsets.fromLTRB(20, 26, 20, 26),
       child: Column(
-        // Unlike the default `center`, this must stretch full-width like _buildForm()'s card -
-        // without it, the Container/Column both shrink-wrap to their widest child's intrinsic
-        // width (the button/text), so the whole card renders as a small box instead of filling
-        // the screen like every other card on this page.
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Center(
-            child: Icon(Icons.fingerprint, size: 46, color: AppColors.brand),
+          Center(
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.blueSoft,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: const AppIcon(AppIcons.fingerprint,
+                  size: 24, color: AppColors.brandStrong, strokeWidth: 1.8),
+            ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 13),
           Text(
-            'Session verrouillée pour ${_usernameOrGeneric()}',
+            'Session verrouillée',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14.5,
-                color: AppColors.ink),
+            style: AppFont.spectral(size: 17, color: AppColors.navy),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 13),
           if (_errorMessage != null) ...[
-            Text(_errorMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.redTx, fontSize: 12.5)),
-            const SizedBox(height: 12),
+            _ErrorBox(message: _errorMessage!),
+            const SizedBox(height: 13),
           ],
-          ElevatedButton.icon(
+          ElevatedButton(
             onPressed: _isSubmitting ? null : () => _unlock(auth),
-            icon: const Icon(Icons.fingerprint),
-            label: const Text('Connexion biométrique'),
+            child: const Text('Déverrouiller'),
           ),
           const SizedBox(height: 10),
-          TextButton(
-            onPressed: _isSubmitting ? null : () => auth.logout(),
-            child: const Text('Se connecter avec identifiant / mot de passe',
-                style: TextStyle(color: AppColors.muted, fontSize: 12.5)),
+          GestureDetector(
+            onTap: _isSubmitting ? null : () => auth.logout(),
+            child: Text(
+              'Se connecter avec identifiant / mot de passe',
+              textAlign: TextAlign.center,
+              style: AppFont.sans(
+                  size: 13, weight: FontWeight.w600, color: AppColors.faint),
+            ),
           ),
         ],
       ),
     );
   }
-
-  String _usernameOrGeneric() => _usernameController.text.trim().isNotEmpty
-      ? _usernameController.text.trim()
-      : 'votre compte';
 
   Future<void> _unlock(AuthService auth) async {
     setState(() {
@@ -350,5 +298,109 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       });
     }
+  }
+
+  InputDecoration _inputDecoration({Widget? suffix}) => InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: AppColors.surface,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        suffixIcon: suffix,
+        suffixIconConstraints:
+            const BoxConstraints(minWidth: 0, minHeight: 0),
+        border: _border(AppColors.border),
+        enabledBorder: _border(AppColors.border),
+        focusedBorder: _border(AppColors.brand),
+        errorStyle: AppFont.sans(size: 11.5, color: AppColors.lateInk),
+      );
+
+  OutlineInputBorder _border(Color color) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: color),
+      );
+}
+
+class _Field extends StatelessWidget {
+  const _Field({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(label,
+            style: AppFont.sans(
+                size: 13, weight: FontWeight.w600, color: AppColors.ink)),
+        const SizedBox(height: 6),
+        child,
+      ],
+    );
+  }
+}
+
+class _Checkbox extends StatelessWidget {
+  const _Checkbox({required this.checked});
+
+  final bool checked;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 17,
+      height: 17,
+      decoration: BoxDecoration(
+        color: checked ? AppColors.brand : AppColors.surface,
+        border: Border.all(color: checked ? AppColors.brand : AppColors.border),
+        borderRadius: BorderRadius.circular(5),
+      ),
+      alignment: Alignment.center,
+      child: checked
+          ? const AppIcon(AppIcons.check,
+              size: 11, color: Colors.white, strokeWidth: 3)
+          : null,
+    );
+  }
+}
+
+class _ErrorBox extends StatelessWidget {
+  const _ErrorBox({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.lateBg,
+        border: Border.all(color: AppColors.lateBorder),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(message,
+          style: AppFont.sans(size: 12.5, color: AppColors.lateInk)),
+    );
+  }
+}
+
+/// Footer of 4e - says biometric unlock exists without naming any vendor's.
+class _BiometricMention extends StatelessWidget {
+  const _BiometricMention();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        const AppIcon(AppIcons.fingerprint,
+            size: 14, color: AppColors.faint, strokeWidth: 1.8),
+        const SizedBox(width: 6),
+        Text('Connexion biométrique',
+            style: AppFont.sans(size: 12, color: AppColors.faint)),
+      ],
+    );
   }
 }

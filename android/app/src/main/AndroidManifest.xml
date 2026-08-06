@@ -28,6 +28,16 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Magic-link deep link (design_handoff_mobile, tour 6): the mailed button opens
+                 campusmanager://login/<token>, which App\Controller\Api\MagicLoginController
+                 trades for a JWT. singleTop above is what makes an already-running app receive
+                 the link instead of starting a second task. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="campusmanager" android:host="login"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

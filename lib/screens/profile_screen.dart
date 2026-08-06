@@ -131,7 +131,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = context.watch<AuthService>().currentUser;
 
     return Scaffold(
+      // top: false - AppHeader applies the status bar inset itself (see its docblock).
       body: SafeArea(
+        top: false,
         child: Column(
           children: [
             AppHeader(
@@ -150,11 +152,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildEmailCard(user),
                   const SizedBox(height: 12),
                   _buildPasswordCard(),
+                  const SizedBox(height: 12),
+                  _buildLogout(),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Signing out used to live in the "Plus" tab, which the four-tab menu removed - the profile,
+  /// reached from the app bar avatar, is now the only place it can be done.
+  Widget _buildLogout() {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton(
+        // Back to the root first: AuthGate swaps the home route for the login screen, but this
+        // pushed profile would stay on top of it - showing a signed-out user their own profile.
+        onPressed: () {
+          final auth = context.read<AuthService>();
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          auth.logout();
+        },
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.lateInk,
+          side: const BorderSide(color: AppColors.border),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+        ),
+        child: Text('Se déconnecter',
+            style: AppFont.sans(
+                size: 14, weight: FontWeight.w600, color: AppColors.lateInk)),
       ),
     );
   }

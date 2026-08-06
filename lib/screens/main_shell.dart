@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../theme/app_theme.dart';
+import '../services/auth_service.dart';
+import '../services/school_mail_service.dart';
+import '../widgets/brand_tab_bar.dart';
 import 'agenda_screen.dart';
 import 'home_screen.dart';
-import 'more_screen.dart';
-import 'quiz_screen.dart';
+import 'school_mail_screen.dart';
 import 'timetable_screen.dart';
+import 'work_screen.dart';
 
-/// The "direction retenue" (chosen direction) from the design: a 5-tab bottom navigation bar
-/// replacing the old Drawer-only menu.
-///
-/// Accueil / Emploi du temps / Agenda / Quiz / Plus. Quiz took the slot Messages used to hold
-/// (design_handoff_quiz, screen 1k): the messaging screens are all still in the codebase, they
-/// simply have no entry point in the app for now - nothing links to MessagesScreen anymore.
+/// The four tabs of the app - Accueil · Emploi du t. · Travaux · Agenda (design_handoff_mobile,
+/// principe 4). The internal messaging left the app with the fifth tab, and the Courrier école is
+/// reached from the app bar's envelope, never from here (principe 5).
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
@@ -25,15 +25,47 @@ class _MainShellState extends State<MainShell> {
 
   // IndexedStack keeps every child mounted (so switching tabs doesn't lose scroll position/state),
   // but that also means every tab's initState() - and its data fetch - would fire at once on
-  // login if all 5 were built up front. Building only the tabs actually visited so far avoids 4
-  // simultaneous network calls the user hasn't asked for yet.
+  // login if all of them were built up front. Building only the tabs actually visited so far
+  // avoids simultaneous network calls the user hasn't asked for yet.
   final Set<int> _visitedIndices = {0};
 
-  void _onDestinationSelected(int index) {
+  /// Drives the gold dot on the app bar's envelope. Read once when the shell mounts and refreshed
+  /// on the way back from the mailbox - the students' box is the only one that has unread mail.
+  int _unreadMail = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshUnread();
+  }
+
+  Future<void> _refreshUnread() async {
+    final auth = context.read<AuthService>();
+    final token = auth.token;
+    if (token == null) return;
+    if (!(auth.currentUser?.roles.contains('ROLE_STUDENT') ?? false)) return;
+
+    try {
+      final mailbox =
+          await SchoolMailService().fetchFolder(token, sent: false);
+      if (mounted) setState(() => _unreadMail = mailbox.unread);
+    } catch (_) {
+      // A mailbox that cannot be read simply shows no dot.
+    }
+  }
+
+  void _select(int index) {
     setState(() {
       _index = index;
       _visitedIndices.add(index);
     });
+  }
+
+  Future<void> _openMail() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => const SchoolMailScreen(),
+    ));
+    await _refreshUnread();
   }
 
   @override
@@ -43,47 +75,25 @@ class _MainShellState extends State<MainShell> {
         index: _index,
         children: [
           HomeScreen(
-            onViewTimetable: () => _onDestinationSelected(1),
-            onViewAgenda: () => _onDestinationSelected(2),
+            onViewTimetable: () => _select(1),
+            onViewWork: () => _select(2),
+            onOpenMail: _openMail,
+            hasUnreadMail: _unreadMail > 0,
           ),
-          _visitedIndices.contains(1) ? const TimetableScreen() : const SizedBox.shrink(),
-          _visitedIndices.contains(2) ? const AgendaScreen() : const SizedBox.shrink(),
-          _visitedIndices.contains(3) ? const QuizScreen() : const SizedBox.shrink(),
-          _visitedIndices.contains(4) ? const MoreScreen() : const SizedBox.shrink(),
+          _visitedIndices.contains(1)
+              ? const TimetableScreen()
+              : const SizedBox.shrink(),
+          _visitedIndices.contains(2)
+              ? WorkScreen(
+                  onOpenMail: _openMail, hasUnreadMail: _unreadMail > 0)
+              : const SizedBox.shrink(),
+          _visitedIndices.contains(3)
+              ? const AgendaScreen()
+              : const SizedBox.shrink(),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: _onDestinationSelected,
-        indicatorColor: AppColors.blueBg,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home, color: AppColors.brand),
-            label: 'Accueil',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month, color: AppColors.brand),
-            label: 'Emploi du t.',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.event_outlined),
-            selectedIcon: Icon(Icons.event, color: AppColors.brand),
-            label: 'Agenda',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.quiz_outlined),
-            selectedIcon: Icon(Icons.quiz, color: AppColors.brand),
-            label: 'Quiz',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.more_horiz),
-            selectedIcon: Icon(Icons.more_horiz, color: AppColors.brand),
-            label: 'Plus',
-          ),
-        ],
-      ),
+      bottomNavigationBar:
+          BrandTabBar(currentIndex: _index, onSelected: _select),
     );
   }
 }

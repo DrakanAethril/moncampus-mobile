@@ -62,5 +62,20 @@
 	<string>Utilisée pour joindre une photo à un message.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Utilisée pour joindre une photo à un message.</string>
+	<!-- Magic-link deep link (design_handoff_mobile, tour 6): the mailed button opens
+	     campusmanager://login/<token>. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>org.beaupeyrat.campusmanager</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>campusmanager</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

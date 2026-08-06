@@ -153,6 +153,17 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Adopts a JWT obtained outside the identifiant/mot de passe form - today only the magic link
+  /// (design_handoff_mobile, tour 6), whose token App\Controller\Api\MagicLoginController has
+  /// already traded for this one. Always remembered: the whole point of the link is not to have to
+  /// prove anything again next time, and the biometric prompt of 6c is offered right after.
+  Future<void> adoptToken(String token) async {
+    _token = token;
+    await _storage.write(key: _tokenStorageKey, value: token);
+    await _fetchCurrentUser();
+    notifyListeners();
+  }
+
   /// Only meaningful once a "Rester connecté" session exists (a token in secure storage) - see
   /// this class's docblock. LoginScreen offers this right after a fresh password login.
   Future<void> setBiometricEnabled(bool enabled) async {
