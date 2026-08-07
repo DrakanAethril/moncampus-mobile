@@ -56,6 +56,11 @@ dependencies:
   # instead of being opened in an external browser like the travaux' public links.
   path_provider: ^2.1.4
   open_filex: ^4.5.0
+  # Listening travaux (design_handoff_enregistrements_audio): the file is streamed straight from its
+  # delivery URL, which needs no Bearer header - unlike the Courrier école attachments above, so
+  # there is nothing to download to a temp file first. just_audio is used for its position stream,
+  # which is what the listen tracking is measured from.
+  just_audio: ^0.9.40
 
 dev_dependencies:
   flutter_test:
