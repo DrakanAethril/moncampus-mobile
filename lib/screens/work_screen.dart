@@ -534,6 +534,11 @@ class _WorkRow extends StatelessWidget {
       if (item.action == WorkAction.read) {
         return _RowButton(label: 'Lire', primary: false, onTap: onRead);
       }
+      // A listening plays inside the sheet rather than anywhere else, so the button opens the very
+      // same screen the row already opens - it is there to say the travail is doable here and now.
+      if (item.action == WorkAction.listen) {
+        return _RowButton(label: 'Écouter', primary: true, onTap: onOpen);
+      }
     }
 
     return const AppIcon(AppIcons.chevronRight,

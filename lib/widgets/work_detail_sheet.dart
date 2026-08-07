@@ -9,6 +9,7 @@ import '../services/work_service.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../utils/french_date.dart';
+import 'work_audio_player.dart';
 
 /// Opens the consultation sheet of one travail (design_handoff_mobile 4c).
 Future<void> showWorkDetailSheet(BuildContext context, WorkItem item) {
@@ -23,7 +24,12 @@ Future<void> showWorkDetailSheet(BuildContext context, WorkItem item) {
 
 /// The travail as the phone shows it: the brief, the deposits it asks for and its attachments -
 /// all in consultation. Every deposit still awaited carries the "Dépôt sur le web" pill instead of
-/// the web's "Déposer" button (handoff, principe 3), and nothing on this sheet writes anything.
+/// the web's "Déposer" button (handoff, principe 3).
+///
+/// One thing on this sheet does write, and only one: the listening of a Listening travail. Listening
+/// is that nature's proof of completion, as a deposit is a submission's, so a student listening on
+/// their phone has to be able to finish there - the handoff requires the tracking to work on mobile
+/// too (design_handoff_enregistrements_audio).
 class WorkDetailSheet extends StatefulWidget {
   const WorkDetailSheet({super.key, required this.item});
 
@@ -58,6 +64,21 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
       if (mounted) {
         setState(() => _error = 'Impossible de contacter le serveur.');
       }
+    }
+  }
+
+  /// A lost progress report costs at most a few seconds of credit, which the next one makes up: the
+  /// server only ever keeps the maximum. Failing loudly here would interrupt the listening for
+  /// nothing, so it stays silent.
+  Future<void> _reportListening(int fileId, int percent) async {
+    final token = context.read<AuthService>().token;
+    if (token == null) return;
+
+    try {
+      await _workService.reportListenProgress(
+          token, widget.item.id, fileId, percent);
+    } catch (_) {
+      // Deliberately ignored - see above.
     }
   }
 
@@ -171,8 +192,23 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
               style: AppFont.sans(
                   size: 13.5, color: AppColors.text, height: 1.65),
             ),
-          if (detail.expectations.isNotEmpty) ...[
+          if (detail.audioFiles.isNotEmpty) ...[
             if (description.isNotEmpty) const SizedBox(height: 15),
+            _SectionLabel(label: 'À écouter · ${detail.audioFiles.length}'),
+            for (final file in detail.audioFiles) ...[
+              const SizedBox(height: 8),
+              WorkAudioPlayer(
+                // Keyed on the file: without it, Flutter would recycle one player's state onto
+                // another file when the list is rebuilt, and credit the wrong recording.
+                key: ValueKey(file.id),
+                file: file,
+                onProgress: (percent) => _reportListening(file.id, percent),
+              ),
+            ],
+          ],
+          if (detail.expectations.isNotEmpty) ...[
+            if (description.isNotEmpty || detail.audioFiles.isNotEmpty)
+              const SizedBox(height: 15),
             _SectionLabel(
                 label: 'Dépôts demandés · ${detail.expectations.length}'),
             for (final expectation in detail.expectations) ...[

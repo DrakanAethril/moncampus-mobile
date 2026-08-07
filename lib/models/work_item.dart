@@ -15,15 +15,19 @@ enum WorkState {
 
 /// What the row's right-hand side offers. A quiz and a reading are actionable on mobile; a deposit
 /// is not - it opens the consultation sheet, which carries the "Dépôt sur le web" pill (handoff,
-/// principe 3).
+/// principe 3). A listening opens the same sheet, but onto its player: the phone is where listening
+/// happens most naturally, and its tracking has to work there too
+/// (design_handoff_enregistrements_audio).
 enum WorkAction {
   quiz,
   read,
+  listen,
   open;
 
   static WorkAction parse(String? value) => switch (value) {
         'quiz' => WorkAction.quiz,
         'read' => WorkAction.read,
+        'listen' => WorkAction.listen,
         _ => WorkAction.open,
       };
 }
@@ -104,6 +108,7 @@ class WorkDetail {
     required this.item,
     required this.expectations,
     required this.attachments,
+    required this.audioFiles,
     this.description,
     this.givenAt,
   });
@@ -120,6 +125,9 @@ class WorkDetail {
         attachments: (json['attachments'] as List<dynamic>? ?? const [])
             .map((e) => WorkAttachment.fromJson(e as Map<String, dynamic>))
             .toList(),
+        audioFiles: (json['audioFiles'] as List<dynamic>? ?? const [])
+            .map((e) => WorkAudioFile.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 
   final WorkItem item;
@@ -127,6 +135,39 @@ class WorkDetail {
   final DateTime? givenAt;
   final List<WorkExpectation> expectations;
   final List<WorkAttachment> attachments;
+
+  /// The files of a Listening travail: the common ones and this student's own. Empty for every
+  /// other nature.
+  final List<WorkAudioFile> audioFiles;
+}
+
+/// One audio file to listen to, with how much of it has already been heard.
+///
+/// [percent] is the furthest point ever reached, not the position of the last playback - the server
+/// keeps a maximum (App\Entity\AudioListenProgress) and the player resumes crediting from it. The
+/// travail counts as done once every one of these files is at 100.
+class WorkAudioFile {
+  const WorkAudioFile({
+    required this.id,
+    required this.name,
+    required this.duration,
+    required this.percent,
+    required this.url,
+  });
+
+  factory WorkAudioFile.fromJson(Map<String, dynamic> json) => WorkAudioFile(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+        duration: json['duration'] as String? ?? '',
+        percent: json['percent'] as int? ?? 0,
+        url: json['url'] as String? ?? '',
+      );
+
+  final int id;
+  final String name;
+  final String duration;
+  final int percent;
+  final String url;
 }
 
 /// One line of "Dépôts demandés" (4c).

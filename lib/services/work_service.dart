@@ -70,6 +70,34 @@ class WorkService {
         .toList();
   }
 
+  /// Reports what the player really heard of one file. The only write this service makes: listening
+  /// is the proof of completion of a Listening travail, so a student listening on their phone has to
+  /// be able to finish it there (design_handoff_enregistrements_audio, "Tracking d'écoute").
+  ///
+  /// Failures are swallowed by the caller: a lost progress report costs at most a few seconds of
+  /// credit, which the next one makes up - the server only ever keeps the maximum.
+  Future<int> reportListenProgress(
+    String token,
+    int assignmentId,
+    int fileId,
+    int percent,
+  ) async {
+    final response = await _client.post(
+      Uri.parse(
+          '${ApiConfig.baseUrl}/api/student-work/$assignmentId/audio/$fileId/listen-progress'),
+      headers: {..._headers(token), 'Content-Type': 'application/json'},
+      body: jsonEncode({'percent': percent}),
+    );
+
+    if (response.statusCode != 200) {
+      throw WorkException("La progression d'écoute n'a pas pu être envoyée.");
+    }
+
+    return (jsonDecode(response.body) as Map<String, dynamic>)['percent']
+            as int? ??
+        percent;
+  }
+
   Map<String, String> _headers(String token) => {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
