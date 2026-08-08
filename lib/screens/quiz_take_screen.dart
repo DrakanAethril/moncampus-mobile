@@ -136,7 +136,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   /// the web's quiz_passation controller - the question closes, the attempt carries on.
   void _startTimer(QuizQuestionPage page) {
     _timer?.cancel();
-    final seconds = page.secondsPerQuestion;
+    final seconds = page.secondsForQuestion;
     if (seconds == null) {
       setState(() => _secondsLeft = null);
       return;
