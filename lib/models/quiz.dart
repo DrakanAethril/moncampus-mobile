@@ -218,7 +218,7 @@ class QuizQuestionPage {
     required this.mode,
     required this.position,
     required this.total,
-    required this.secondsPerQuestion,
+    required this.secondsForQuestion,
     required this.deadline,
     required this.question,
   });
@@ -229,7 +229,10 @@ class QuizQuestionPage {
   final String mode;
   final int position;
   final int total;
-  final int? secondsPerQuestion;
+
+  /// Seconds allowed for THIS question - the quiz's default unless the question overrides it or
+  /// lifts the limit for itself. Null means no countdown at all.
+  final int? secondsForQuestion;
 
   /// Wall-clock instant the whole attempt expires (global timer or closing date, whichever comes
   /// first). Absent when the quiz has neither.
@@ -243,7 +246,9 @@ class QuizQuestionPage {
         mode: json['mode'] as String? ?? '',
         position: json['position'] as int? ?? 0,
         total: json['total'] as int? ?? 0,
-        secondsPerQuestion: json['secondsPerQuestion'] as int?,
+        // Older servers only send secondsPerQuestion, which was the quiz-wide value; falling back
+        // on it keeps this build working against one of those.
+        secondsForQuestion: json['secondsForQuestion'] as int? ?? json['secondsPerQuestion'] as int?,
         deadline: json['deadline'] != null ? DateTime.tryParse(json['deadline'] as String) : null,
         question: json['question'] != null ? QuizQuestion.fromJson(json['question'] as Map<String, dynamic>) : null,
       );
