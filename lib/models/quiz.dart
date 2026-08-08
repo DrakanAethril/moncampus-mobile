@@ -246,9 +246,13 @@ class QuizQuestionPage {
         mode: json['mode'] as String? ?? '',
         position: json['position'] as int? ?? 0,
         total: json['total'] as int? ?? 0,
-        // Older servers only send secondsPerQuestion, which was the quiz-wide value; falling back
-        // on it keeps this build working against one of those.
-        secondsForQuestion: json['secondsForQuestion'] as int? ?? json['secondsPerQuestion'] as int?,
+        // Older servers only send secondsPerQuestion, the quiz-wide value; falling back on it
+        // keeps this build working against one of those. Keyed on whether the field is THERE, not
+        // on whether it is null - a present null is the whole point of the field, it means this
+        // question has no time limit, and `??` would silently put the quiz's limit back.
+        secondsForQuestion: json.containsKey('secondsForQuestion')
+            ? json['secondsForQuestion'] as int?
+            : json['secondsPerQuestion'] as int?,
         deadline: json['deadline'] != null ? DateTime.tryParse(json['deadline'] as String) : null,
         question: json['question'] != null ? QuizQuestion.fromJson(json['question'] as Map<String, dynamic>) : null,
       );
