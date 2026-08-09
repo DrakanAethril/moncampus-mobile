@@ -1,0 +1,59 @@
+moncampus-mobile
+Copyright (c) 2026 Sébastien Tharaud
+
+Licensed under the MIT License - see the LICENSE file.
+
+This app is the mobile client of MonCampus (https://github.com/DrakanAethril/moncampus),
+which is licensed under the GNU Affero General Public License v3 or later. The two
+licences are deliberately different: this client is distributed through app stores,
+and the terms of Apple's App Store are widely held to be incompatible with the GPL
+family of licences. Do not relicense this repository under the AGPL.
+
+
+--------------------------------------------------------------------------------
+Names, logos and emblems
+--------------------------------------------------------------------------------
+
+The MIT licence covers the source code. It does NOT grant any right to use the
+names, trademarks, logos or emblems of Institution Beaupeyrat, which remain the
+property of that institution and are excluded from the licence.
+
+This applies in particular to:
+
+    assets/brand/
+    assets/icons/
+
+If you fork this project, replace those files with your own branding.
+
+
+--------------------------------------------------------------------------------
+Bundled fonts
+--------------------------------------------------------------------------------
+
+The fonts in assets/google_fonts/ are redistributed with this app under the SIL
+Open Font License 1.1. Their full licence texts are included alongside them and
+must be kept with any redistribution.
+
+Source Sans 3 (assets/google_fonts/SourceSans3-*.ttf)
+    Copyright 2010-2020 Adobe (http://www.adobe.com/), with Reserved Font Name
+    'Source'. All Rights Reserved. Source is a trademark of Adobe in the United
+    States and/or other countries.
+    SIL Open Font License 1.1 - see assets/google_fonts/OFL-SourceSans3.txt
+
+Spectral (assets/google_fonts/Spectral-*.ttf)
+    Copyright 2017 The Spectral Project Authors
+    (https://github.com/productiontype/Spectral)
+    SIL Open Font License 1.1 - see assets/google_fonts/OFL-Spectral.txt
+
+
+--------------------------------------------------------------------------------
+Third-party packages
+--------------------------------------------------------------------------------
+
+This app depends on Flutter and on packages from pub.dev (see pubspec.yaml and
+pubspec.lock), each under its own licence - predominantly BSD-3-Clause, MIT and
+Apache-2.0. Flutter itself is BSD-3-Clause, copyright 2014 The Flutter Authors.
+
+Flutter maintains a per-package licence registry at runtime. This app does not
+currently surface it; adding a showLicensePage() entry point (typically from the
+profile screen) would expose the full list to users.
