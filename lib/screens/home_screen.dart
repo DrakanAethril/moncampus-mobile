@@ -76,15 +76,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Independent widgets, independent failures - one card not loading shouldn't blank the
     // others (unlike TimetableScreen's single-source dependency).
+    // Both the live contest and the work board are student-only endpoints on the API side - a
+    // teacher or an admin asking for them gets a 403 the backend logs as an error, so the gate
+    // is here rather than in the catchError above.
     final results = await Future.wait([
       _timetableService
           .fetchWeek(token, from: monday, to: sunday)
           .catchError((_) => <LessonSession>[]),
-      _quizLiveService.fetchActive(token).catchError((_) => null),
-      if (isStudent)
+      if (isStudent) ...[
+        _quizLiveService.fetchActive(token).catchError((_) => null),
         _workService
             .fetchStudentBoard(token)
             .catchError((_) => const WorkBoard(items: [], subjects: [])),
+      ],
     ]);
 
     if (!mounted) return;
@@ -97,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _todaySessions = todaySessions;
-      _activeLiveSession = results[1] as QuizLiveActiveSession?;
+      _activeLiveSession = isStudent ? results[1] as QuizLiveActiveSession? : null;
       _board = isStudent ? results[2] as WorkBoard : null;
       _loading = false;
     });
