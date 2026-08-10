@@ -111,9 +111,11 @@ class _AuthGateState extends State<AuthGate> {
   }
 }
 
-/// The app's own first frame (design_handoff_mobile 4f): medallion and logotype on navy, nothing
-/// else. Identical to the native splash the system paints before the engine is up, so the handover
-/// between the two is invisible.
+/// The app's own first frame (design_handoff_mobile 4f): emblem and logotype on navy, nothing
+/// else. It must stay identical to the native splash the system paints before the engine is up,
+/// so the handover between the two is invisible - which is why the emblem is bare here, like the
+/// launcher icon and the splash asset, rather than sitting in the ringed medallion the app bar
+/// and the connexion screens use (BrandMedallion).
 class LaunchScreen extends StatelessWidget {
   const LaunchScreen({super.key});
 
@@ -125,18 +127,15 @@ class LaunchScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            BrandMedallion(
-              size: 112,
-              ringWidth: 5,
-              shadow: [
-                BoxShadow(
-                  color: Color(0x66000000),
-                  blurRadius: 40,
-                  offset: Offset(0, 16),
-                ),
-              ],
+            // Same footprint as the native splash draws it - measured, not guessed: Android 12+
+            // paints the splash icon over a 288dp canvas whatever the asset's pixel size, and the
+            // emblem covers 264 of its 512px, hence 148.
+            Image(
+              image: AssetImage('assets/brand/embleme-white.png'),
+              height: 148,
+              fit: BoxFit.contain,
             ),
-            SizedBox(height: 18),
+            SizedBox(height: 22),
             BrandWordmark.hero(),
           ],
         ),
