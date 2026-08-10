@@ -240,7 +240,13 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
                 height: 38,
                 decoration: BoxDecoration(color: const Color(0xFF12344D), shape: BoxShape.circle, border: Border.all(color: AppColors.gold, width: 2.5)),
                 alignment: Alignment.center,
-                child: Text('$_remainingSeconds', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                // Untimed question (its own "Illimité" mode, or a quiz with no default): the tick
+                // has nothing to count down and the teacher is the one who moves on, so the badge
+                // says so instead of showing the 0 the counter is still sitting on.
+                child: Text(
+                  null == _state.secondsPerQuestion ? '∞' : '$_remainingSeconds',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                ),
               ),
             ],
           ),
