@@ -45,7 +45,7 @@ class MonCampusApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'moncampus',
+      title: 'Campus Beaupeyrat',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       navigatorKey: navigatorKey,
