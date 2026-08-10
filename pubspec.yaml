@@ -125,10 +125,16 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/custom-fonts/#from-packages
 
-# App icon of design_handoff_mobile 4f: navy tile, medallion centred (assets generated from
-# assets/brand/embleme-white.png). adaptive_icon_background/foreground/monochrome cover Android 8+
-# adaptive icons + the Android 13+ themed monochrome layer; flutter_launcher_icons also
-# (re)generates the legacy mipmap-* fallback PNGs for API <26 from image_path.
+# App icon of design_handoff_mobile 4f: navy tile, emblem centred (assets generated from the
+# crest of assets/images/campus-badge-white.png in the moncampus repo, the only high-resolution
+# copy of it). adaptive_icon_background/foreground/monochrome cover Android 8+ adaptive icons +
+# the Android 13+ themed monochrome layer; flutter_launcher_icons also (re)generates the legacy
+# mipmap-* fallback PNGs for API <26 from image_path.
+#
+# The foreground artwork is already sized for the full 108dp canvas - the emblem is half of it,
+# so its circumscribed circle lands just inside the 72dp the launcher mask keeps. Hence the
+# explicit inset of 0: flutter_launcher_icons 0.14 defaults it to 16%, which shrank the artwork a
+# second time and is what made the icon look lost in the middle of its own tile.
 flutter_launcher_icons:
   android: true
   ios: false
@@ -136,6 +142,7 @@ flutter_launcher_icons:
   adaptive_icon_background: "#12344D"
   adaptive_icon_foreground: "assets/icons/moncampus/adaptive_foreground_432.png"
   adaptive_icon_monochrome: "assets/icons/moncampus/adaptive_monochrome_432.png"
+  adaptive_icon_foreground_inset: 0
 
 # Launch screen of design_handoff_mobile 4f - Android 12+'s native SplashScreen API draws $color +
 # $image before the Flutter engine is even up; the app's own first frame (LaunchScreen in main.dart)
