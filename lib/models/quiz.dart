@@ -218,6 +218,64 @@ class QuizZoneChoice {
       QuizZoneChoice(key: json['key'] as String, text: json['text'] as String? ?? '');
 }
 
+/// One item a student can place on an Apparier question - the right side of a real pair, or a
+/// decoy. [imageUrl] is filled only on an image column, and [text] is then the item's alternative
+/// text rather than its content.
+class QuizMatchingChoice {
+  const QuizMatchingChoice({required this.key, required this.text, required this.imageUrl});
+
+  final String key;
+  final String text;
+  final String? imageUrl;
+
+  factory QuizMatchingChoice.fromJson(Map<String, dynamic> json) => QuizMatchingChoice(
+        key: json['key'] as String,
+        text: json['text'] as String? ?? '',
+        imageUrl: json['imageUrl'] as String?,
+      );
+}
+
+/// One row of an Apparier question. [right]/[rightImageUrl] are null during the passation - that
+/// side *is* the answer, and the server only sends it back at correction time.
+class QuizMatchingPair {
+  const QuizMatchingPair({
+    required this.id,
+    required this.left,
+    required this.leftImageUrl,
+    required this.right,
+    required this.rightImageUrl,
+  });
+
+  final String id;
+  final String left;
+  final String? leftImageUrl;
+  final String? right;
+  final String? rightImageUrl;
+
+  bool get hasAnswer => right != null || rightImageUrl != null;
+
+  factory QuizMatchingPair.fromJson(Map<String, dynamic> json) => QuizMatchingPair(
+        id: json['id'] as String,
+        left: json['left'] as String? ?? '',
+        leftImageUrl: json['leftImageUrl'] as String?,
+        right: json['right'] as String?,
+        rightImageUrl: json['rightImageUrl'] as String?,
+      );
+}
+
+/// The two column titles of an Apparier question. Empty strings rather than nulls, matching the
+/// server: a caller that has to test before printing a header is one that will forget to.
+class QuizMatchingHeaders {
+  const QuizMatchingHeaders({required this.left, required this.right});
+
+  final String left;
+  final String right;
+
+  factory QuizMatchingHeaders.fromJson(dynamic json) => json is Map
+      ? QuizMatchingHeaders(left: json['left'] as String? ?? '', right: json['right'] as String? ?? '')
+      : const QuizMatchingHeaders(left: '', right: '');
+}
+
 class QuizQuestion {
   const QuizQuestion({
     required this.type,
@@ -233,9 +291,13 @@ class QuizQuestion {
     required this.zoneChoices,
     required this.zoneHintIds,
     required this.zoneMultiple,
+    required this.matchingHeaders,
+    required this.matchingPairs,
+    required this.matchingChoices,
   });
 
-  /// 'qcm' | 'qcm_multi' | 'vrai_faux' | 'image' | 'ordre' | 'texte_a_trous' | 'zone' | 'legende'.
+  /// 'qcm' | 'qcm_multi' | 'vrai_faux' | 'image' | 'ordre' | 'texte_a_trous' | 'zone' | 'legende'
+  /// | 'apparier'.
   final String type;
   final String label;
   final String? imageUrl;
@@ -259,6 +321,12 @@ class QuizQuestion {
   /// True when a Zone question expects several zones to be tapped.
   final bool zoneMultiple;
 
+  /// Apparier: the left column already shuffled for this attempt, and the pool of items to place.
+  /// Both empty unless [type] is 'apparier'.
+  final QuizMatchingHeaders matchingHeaders;
+  final List<QuizMatchingPair> matchingPairs;
+  final List<QuizMatchingChoice> matchingChoices;
+
   bool get isBlanks => type == 'texte_a_trous';
   bool get isMulti => type == 'qcm_multi';
   bool get isOrder => type == 'ordre';
@@ -266,6 +334,7 @@ class QuizQuestion {
   bool get isZone => type == 'zone';
   bool get isLegende => type == 'legende';
   bool get isZones => isZone || isLegende;
+  bool get isApparier => type == 'apparier';
   bool get isImageSupport => zoneKind == 'image';
 
   int get blankCount => blankSegments.where((s) => s.isBlank).length;
@@ -297,6 +366,13 @@ class QuizQuestion {
             .toList(),
         zoneHintIds: (json['zoneHintIds'] as List<dynamic>? ?? []).map((e) => e as String).toList(),
         zoneMultiple: json['zoneMultiple'] as bool? ?? false,
+        matchingHeaders: QuizMatchingHeaders.fromJson(json['matchingHeaders']),
+        matchingPairs: (json['matchingPairs'] as List<dynamic>? ?? [])
+            .map((e) => QuizMatchingPair.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        matchingChoices: (json['matchingChoices'] as List<dynamic>? ?? [])
+            .map((e) => QuizMatchingChoice.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 }
 
@@ -388,6 +464,12 @@ class QuizCorrectionEntry {
     required this.zoneLabels,
     required this.zoneChoices,
     required this.zoneFeedback,
+    required this.matchingHeaders,
+    required this.matchingPairs,
+    required this.matchingChoices,
+    required this.matchingResponses,
+    required this.matchingResults,
+    required this.matchingFeedback,
   });
 
   final String label;
@@ -422,10 +504,25 @@ class QuizCorrectionEntry {
   /// Zone: zone id tapped by mistake => the teacher's "why this one is wrong" text.
   final Map<String, String> zoneFeedback;
 
+  /// Apparier, at correction time - the pairs now carry their right-hand side, which is the answer.
+  final QuizMatchingHeaders matchingHeaders;
+  final List<QuizMatchingPair> matchingPairs;
+  final List<QuizMatchingChoice> matchingChoices;
+
+  /// pair id => the choice key the student placed on it.
+  final Map<String, String> matchingResponses;
+
+  /// pair id => right/wrong.
+  final Map<String, bool> matchingResults;
+
+  /// pair id the student got wrong => the teacher's "why these two go together" text.
+  final Map<String, String> matchingFeedback;
+
   bool get isBlanks => type == 'texte_a_trous';
   bool get isZone => type == 'zone';
   bool get isLegende => type == 'legende';
   bool get isZones => isZone || isLegende;
+  bool get isApparier => type == 'apparier';
   bool get isImageSupport => zoneKind == 'image';
 
   factory QuizCorrectionEntry.fromJson(Map<String, dynamic> json) {
@@ -469,6 +566,18 @@ class QuizCorrectionEntry {
           .map((e) => QuizZoneChoice.fromJson(e as Map<String, dynamic>))
           .toList(),
       zoneFeedback: mapOf<String>(json['zoneFeedback']),
+      matchingHeaders: QuizMatchingHeaders.fromJson(json['matchingHeaders']),
+      matchingPairs: (json['matchingPairs'] as List<dynamic>? ?? [])
+          .map((e) => QuizMatchingPair.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      matchingChoices: (json['matchingChoices'] as List<dynamic>? ?? [])
+          .map((e) => QuizMatchingChoice.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      // An empty PHP array serializes as [] rather than {} - mapOf() already treats anything that
+      // is not a Map as empty, which is the same guard zoneResults needs.
+      matchingResponses: mapOf<String>(json['matchingResponses']),
+      matchingResults: mapOf<bool>(json['matchingResults']),
+      matchingFeedback: mapOf<String>(json['matchingFeedback']),
     );
   }
 }
