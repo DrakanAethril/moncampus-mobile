@@ -71,17 +71,29 @@ class QuizService {
   /// submission order, which only matters for an "ordre" question); [blanks] carries one entry per
   /// blank of a texte à trous, in text order. Both modes of a texte à trous - placed words and
   /// typed text - use the very same [blanks] list, so the server never needs to tell them apart.
+  /// [zones] carries a Zone question's tapped zone ids; [placements] a Légende's zone => choice
+  /// pairs, sent as {"zone", "choice"} objects (the server's JsonRequestPayload reads object
+  /// lists, not maps).
   Future<({bool concluded, int? nextPosition})> submitAnswer(
     String token,
     int attemptId,
     int position, {
     List<int> answerIds = const [],
     List<String> blanks = const [],
+    List<String> zones = const [],
+    Map<String, String> placements = const {},
   }) async {
     final response = await _client.post(
       Uri.parse('${ApiConfig.baseUrl}/api/quiz/attempt/$attemptId/question/$position/answer'),
       headers: {..._headers(token), 'Content-Type': 'application/json'},
-      body: jsonEncode({'answers': answerIds, 'blanks': blanks}),
+      body: jsonEncode({
+        'answers': answerIds,
+        'blanks': blanks,
+        'zones': zones,
+        'placements': [
+          for (final entry in placements.entries) {'zone': entry.key, 'choice': entry.value},
+        ],
+      }),
     );
 
     if (response.statusCode != 200) {

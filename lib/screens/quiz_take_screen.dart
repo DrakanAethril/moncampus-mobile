@@ -7,6 +7,7 @@ import '../models/quiz.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/quiz_zone_support.dart';
 
 /// Individual passation on mobile - the phone counterpart of the web's program/quiz_question.html.twig
 /// (screen 1e) and its correction (1m), including the "texte à trous" type (screens 2c/2d) that a
@@ -54,6 +55,14 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   List<String> _blanks = [];
   String? _selectedWord;
   final List<TextEditingController> _blankControllers = [];
+
+  /// Zone question: the zone ids currently tapped.
+  final Set<String> _zoneSelected = {};
+
+  /// Légende question: zone id => placed choice key, and the chip currently armed for placing.
+  final Map<String, String> _placements = {};
+  String? _activeChoiceKey;
+  bool _hintShown = false;
 
   Timer? _timer;
   int? _secondsLeft;
@@ -114,6 +123,10 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   void _resetAnswerState(QuizQuestion question) {
     _selected.clear();
     _selectedWord = null;
+    _zoneSelected.clear();
+    _placements.clear();
+    _activeChoiceKey = null;
+    _hintShown = false;
     _ordered = question.isOrder ? question.answers.map((a) => a.id).toList() : [];
 
     for (final controller in _blankControllers) {
@@ -175,6 +188,8 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         page.position,
         answerIds: answerIds,
         blanks: question.isBlanks ? _blanks : const [],
+        zones: question.isZone ? _zoneSelected.toList() : const [],
+        placements: question.isLegende ? Map.of(_placements) : const {},
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -288,7 +303,12 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              if (question.isBlanks) ..._buildBlanks(question) else ..._buildStandard(question),
+              if (question.isBlanks)
+                ..._buildBlanks(question)
+              else if (question.isZones)
+                ..._buildZones(question)
+              else
+                ..._buildStandard(question),
             ],
           ),
         ),
@@ -558,6 +578,107 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     }).toList();
   }
 
+  /// The two "zones" types: tap the right zone(s) of a support (zone), or arm a label chip then
+  /// tap the zone it belongs on (legende) - the phone counterpart of the web's
+  /// _quiz_zone_take / _quiz_legende_take partials. Same tap-not-drag interaction as the word bank.
+  List<Widget> _buildZones(QuizQuestion question) {
+    final hint = question.isLegende
+        ? 'Touchez une étiquette, puis la zone où la placer. Retouchez une zone remplie pour reprendre son étiquette.'
+        : (question.zoneMultiple
+            ? 'Plusieurs zones sont attendues : touchez chacune d\'elles (retoucher désélectionne).'
+            : 'Touchez la zone demandée dans le support.');
+
+    return [
+      Text(question.label,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.ink, height: 1.4)),
+      const SizedBox(height: 6),
+      Text(hint, style: const TextStyle(fontSize: 12.5, color: AppColors.faint)),
+      const SizedBox(height: 14),
+      QuizZoneSupport(
+        kind: question.zoneKind ?? 'texte',
+        lines: question.zoneLines,
+        imageZones: question.imageZones,
+        imageUrl: question.imageUrl,
+        stateOf: (id) {
+          if (question.isZone && _zoneSelected.contains(id)) return ZoneVisualState.selected;
+          if (_hintShown && !question.zoneHintIds.contains(id)) return ZoneVisualState.dimmed;
+          return ZoneVisualState.none;
+        },
+        placedTextOf: question.isLegende ? (id) => _choiceText(question, _placements[id]) : null,
+        onZoneTap: (id) => setState(() {
+          if (question.isZone) {
+            _zoneSelected.contains(id) ? _zoneSelected.remove(id) : _zoneSelected.add(id);
+          } else if (_placements.containsKey(id)) {
+            // A filled zone hands its label back, whatever chip is armed.
+            _placements.remove(id);
+          } else if (_activeChoiceKey != null) {
+            _placements[id] = _activeChoiceKey!;
+            _activeChoiceKey = null;
+          }
+        }),
+      ),
+      if (question.isZone && question.zoneHintIds.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton(
+            onPressed: () => setState(() => _hintShown = !_hintShown),
+            child: const Text('? Indice'),
+          ),
+        ),
+      ],
+      if (question.isLegende) ...[
+        const SizedBox(height: 20),
+        const Text('ÉTIQUETTES À PLACER',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.faint, letterSpacing: .5)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8, children: _buildChoiceChips(question)),
+        const SizedBox(height: 14),
+        Text('${_placements.length} / ${question.zoneIds.length} étiquettes placées',
+            style: const TextStyle(fontSize: 12.5, color: AppColors.faint)),
+      ],
+    ];
+  }
+
+  String? _choiceText(QuizQuestion question, String? key) {
+    if (key == null) return null;
+    for (final choice in question.zoneChoices) {
+      if (choice.key == key) return choice.text;
+    }
+    return key;
+  }
+
+  List<Widget> _buildChoiceChips(QuizQuestion question) {
+    final usedKeys = _placements.values.toSet();
+
+    return question.zoneChoices.map((choice) {
+      final used = usedKeys.contains(choice.key);
+      final isActive = !used && _activeChoiceKey == choice.key;
+
+      // Same chip states as the word bank: armed = blue halo, placed = greyed strikethrough.
+      return GestureDetector(
+        onTap: used ? null : () => setState(() => _activeChoiceKey = isActive ? null : choice.key),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: used ? AppColors.surfaceAlt : (isActive ? AppColors.blueBg : AppColors.surface),
+            border: Border.all(color: isActive ? AppColors.brand : AppColors.border),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            choice.text,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
+              color: used ? AppColors.faint : (isActive ? AppColors.blueTx : AppColors.ink),
+              decoration: used ? TextDecoration.lineThrough : null,
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
   Widget _buildFooter(QuizQuestionPage page, QuizQuestion question) {
     final isLast = page.position + 1 >= page.total;
 
@@ -662,7 +783,12 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
             ],
           ),
           const SizedBox(height: 10),
-          if (entry.isBlanks) ..._buildBlankCorrection(entry) else ..._buildAnswerCorrection(entry),
+          if (entry.isBlanks)
+            ..._buildBlankCorrection(entry)
+          else if (entry.isZones)
+            ..._buildZoneCorrection(entry)
+          else
+            ..._buildAnswerCorrection(entry),
           if (entry.explanation != null && !entry.isCorrect) ...[
             const SizedBox(height: 10),
             Container(
@@ -700,6 +826,56 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         ),
       );
     }).toList();
+  }
+
+  /// The support replayed read-only: expected zones in green, a wrongly tapped/placed one in red,
+  /// then the teacher's per-zone feedbacks - the phone counterpart of the web's
+  /// _quiz_attempt_breakdown zone branches.
+  List<Widget> _buildZoneCorrection(QuizCorrectionEntry entry) {
+    String? choiceText(String? key) {
+      if (key == null) return null;
+      for (final choice in entry.zoneChoices) {
+        if (choice.key == key) return choice.text;
+      }
+      return key;
+    }
+
+    final wrongLegendeZones =
+        entry.zoneResults.entries.where((e) => !e.value).map((e) => e.key).toList();
+
+    return [
+      QuizZoneSupport(
+        kind: entry.zoneKind ?? 'texte',
+        lines: entry.zoneLines,
+        imageZones: entry.imageZones,
+        imageUrl: entry.imageUrl,
+        stateOf: (id) {
+          if (entry.isZone) {
+            if (entry.zoneCorrectIds.contains(id)) return ZoneVisualState.good;
+            if (entry.zoneClicked.contains(id)) return ZoneVisualState.bad;
+            return ZoneVisualState.none;
+          }
+          final right = entry.zoneResults[id];
+          if (right == null) return ZoneVisualState.none;
+          return right ? ZoneVisualState.good : ZoneVisualState.bad;
+        },
+        placedTextOf: entry.isLegende ? (id) => choiceText(entry.zonePlacements[id]) : null,
+      ),
+      // Zone: the teacher's "why this one is wrong" for each mistakenly tapped zone.
+      for (final id in entry.zoneClicked)
+        if (entry.zoneFeedback[id] != null) ...[
+          const SizedBox(height: 8),
+          Text(entry.zoneFeedback[id]!,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.redTx, fontWeight: FontWeight.w600)),
+        ],
+      // Légende: what belonged on each zone that ended up wrong or empty.
+      for (final id in wrongLegendeZones)
+        if (entry.zoneLabels[id] != null) ...[
+          const SizedBox(height: 6),
+          Text('Attendu : ${entry.zoneLabels[id]}',
+              style: const TextStyle(fontSize: 12, color: AppColors.greenTx, fontWeight: FontWeight.w600)),
+        ],
+    ];
   }
 
   List<Widget> _buildBlankCorrection(QuizCorrectionEntry entry) {
