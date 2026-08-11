@@ -67,6 +67,9 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   /// shared: the two are the same shape but not the same thing, and one map serving both would
   /// carry a légende's answer into the next question if a reset were ever missed.
   final Map<String, String> _associations = {};
+
+  /// Numérique / Calculée: the answer as typed, comma and unit included - the server reads it.
+  final TextEditingController _numericController = TextEditingController();
   String? _activeChoiceKey;
   bool _hintShown = false;
 
@@ -86,6 +89,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _numericController.dispose();
     for (final controller in _blankControllers) {
       controller.dispose();
     }
@@ -132,6 +136,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     _zoneSelected.clear();
     _placements.clear();
     _associations.clear();
+    _numericController.clear();
     _activeChoiceKey = null;
     _hintShown = false;
     _ordered = question.isOrder ? question.answers.map((a) => a.id).toList() : [];
@@ -198,6 +203,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         zones: question.isZone ? _zoneSelected.toList() : const [],
         placements: question.isLegende ? Map.of(_placements) : const {},
         associations: question.isApparier ? Map.of(_associations) : const {},
+        numeric: question.isNumeric ? _numericController.text : '',
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -317,6 +323,8 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                 ..._buildZones(question)
               else if (question.isApparier)
                 ..._buildMatching(question)
+              else if (question.isNumeric)
+                ..._buildNumeric(question)
               else
                 ..._buildStandard(question),
             ],
@@ -650,6 +658,101 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     ];
   }
 
+  /// A Numérique / Calculée question: the statement (already carrying this student's own drawn
+  /// values - the server renders it, the app never substitutes anything) and one field for the
+  /// number.
+  ///
+  /// A plain text field with a decimal keyboard rather than a number-only input: a French keyboard
+  /// produces a comma, and a stricter field would swallow the keystroke without telling the student
+  /// why. The server reads "2,5", "1 234,5" and "240 km" alike.
+  List<Widget> _buildNumeric(QuizQuestion question) {
+    final unit = question.numericUnit;
+    final showFixedUnit = unit != null && !question.numericUnitRequired;
+
+    return [
+      Text(question.numericStatement ?? question.label,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.ink, height: 1.5)),
+      const SizedBox(height: 18),
+      Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _numericController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.ink),
+              decoration: const InputDecoration(hintText: 'Votre réponse'),
+            ),
+          ),
+          if (showFixedUnit) ...[
+            const SizedBox(width: 10),
+            // A fixed unit sits beside the field so the student types only the number; when the
+            // teacher requires the unit it is part of the answer and the hint below says so.
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceAlt,
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(unit,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.faint)),
+            ),
+          ],
+        ],
+      ),
+      if (unit != null && question.numericUnitRequired) ...[
+        const SizedBox(height: 8),
+        const Text("Indiquez aussi l'unité.", style: TextStyle(fontSize: 12.5, color: AppColors.faint)),
+      ],
+    ];
+  }
+
+  /// The numeric correction: what they typed, and what was expected of them - for a calculée, under
+  /// the statement they were actually asked, since no two students got the same one.
+  List<Widget> _buildNumericCorrection(QuizCorrectionEntry entry) {
+    final decimals = entry.numericDecimals;
+    String format(double value) => value.toStringAsFixed(decimals).replaceAll('.', ',');
+    final unit = entry.numericUnit != null ? ' ${entry.numericUnit}' : '';
+    final typed = entry.numericRaw;
+
+    return [
+      if (entry.numericStatement != null) ...[
+        Text(entry.numericStatement!,
+            style: const TextStyle(fontSize: 13.5, color: AppColors.ink, height: 1.6)),
+        const SizedBox(height: 8),
+      ],
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          _numericChip(
+            'Votre réponse : ${typed != null && typed.isNotEmpty ? typed : '—'}',
+            entry.isCorrect ? AppColors.greenBg : AppColors.redBg,
+            entry.isCorrect ? AppColors.greenTx : AppColors.redTx,
+          ),
+          if (entry.numericExpected != null)
+            _numericChip('Attendu : ${format(entry.numericExpected!)}$unit', AppColors.surfaceAlt, AppColors.ink),
+        ],
+      ),
+      if (entry.numericExpected != null && (entry.numericMargin ?? 0) > 0) ...[
+        const SizedBox(height: 6),
+        Text(
+          '(de ${format(entry.numericExpected! - entry.numericMargin!)} à ${format(entry.numericExpected! + entry.numericMargin!)})',
+          style: const TextStyle(fontSize: 12, color: AppColors.faint),
+        ),
+      ],
+    ];
+  }
+
+  Widget _numericChip(String text, Color background, Color foreground) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(7)),
+      child: Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: foreground)),
+    );
+  }
+
   /// An Apparier question: arm an item of the pool, then tap the slot it belongs to - the phone
   /// counterpart of the web's _quiz_apparier_take partial, and the same tap-not-drag interaction as
   /// the word bank and the légende labels. Either column may be pictures; that is entirely the
@@ -911,6 +1014,8 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
             ..._buildZoneCorrection(entry)
           else if (entry.isApparier)
             ..._buildMatchingCorrection(entry)
+          else if (entry.isNumeric)
+            ..._buildNumericCorrection(entry)
           else
             ..._buildAnswerCorrection(entry),
           if (entry.explanation != null && !entry.isCorrect) ...[

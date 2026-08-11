@@ -83,6 +83,7 @@ class QuizService {
     List<String> zones = const [],
     Map<String, String> placements = const {},
     Map<String, String> associations = const {},
+    String numeric = '',
   }) async {
     final response = await _client.post(
       Uri.parse('${ApiConfig.baseUrl}/api/quiz/attempt/$attemptId/question/$position/answer'),
@@ -99,6 +100,10 @@ class QuizService {
         'pairs': [
           for (final entry in associations.entries) {'pair': entry.key, 'choice': entry.value},
         ],
+        // Numérique / Calculée: sent verbatim, comma and unit included. The server owns the reading
+        // (App\Util\NumericAnswerParser) so the app and the grader can never disagree on what
+        // "2,5 m" means.
+        'numeric': numeric,
       }),
     );
 
