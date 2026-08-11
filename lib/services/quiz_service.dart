@@ -82,6 +82,7 @@ class QuizService {
     List<String> blanks = const [],
     List<String> zones = const [],
     Map<String, String> placements = const {},
+    Map<String, String> associations = const {},
   }) async {
     final response = await _client.post(
       Uri.parse('${ApiConfig.baseUrl}/api/quiz/attempt/$attemptId/question/$position/answer'),
@@ -92,6 +93,11 @@ class QuizService {
         'zones': zones,
         'placements': [
           for (final entry in placements.entries) {'zone': entry.key, 'choice': entry.value},
+        ],
+        // Apparier, same shape one type over: a list of objects rather than a map, so the payload
+        // stays a list whatever the keys are (App\Service\JsonRequestPayload::objects()).
+        'pairs': [
+          for (final entry in associations.entries) {'pair': entry.key, 'choice': entry.value},
         ],
       }),
     );

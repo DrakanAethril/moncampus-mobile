@@ -7,6 +7,7 @@ import '../models/quiz.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/quiz_matching_board.dart';
 import '../widgets/quiz_zone_support.dart';
 
 /// Individual passation on mobile - the phone counterpart of the web's program/quiz_question.html.twig
@@ -61,6 +62,11 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
 
   /// Légende question: zone id => placed choice key, and the chip currently armed for placing.
   final Map<String, String> _placements = {};
+
+  /// Apparier question: pair id => placed choice key. Kept apart from [_placements] rather than
+  /// shared: the two are the same shape but not the same thing, and one map serving both would
+  /// carry a légende's answer into the next question if a reset were ever missed.
+  final Map<String, String> _associations = {};
   String? _activeChoiceKey;
   bool _hintShown = false;
 
@@ -125,6 +131,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     _selectedWord = null;
     _zoneSelected.clear();
     _placements.clear();
+    _associations.clear();
     _activeChoiceKey = null;
     _hintShown = false;
     _ordered = question.isOrder ? question.answers.map((a) => a.id).toList() : [];
@@ -190,6 +197,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         blanks: question.isBlanks ? _blanks : const [],
         zones: question.isZone ? _zoneSelected.toList() : const [],
         placements: question.isLegende ? Map.of(_placements) : const {},
+        associations: question.isApparier ? Map.of(_associations) : const {},
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -307,6 +315,8 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                 ..._buildBlanks(question)
               else if (question.isZones)
                 ..._buildZones(question)
+              else if (question.isApparier)
+                ..._buildMatching(question)
               else
                 ..._buildStandard(question),
             ],
@@ -640,6 +650,118 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     ];
   }
 
+  /// An Apparier question: arm an item of the pool, then tap the slot it belongs to - the phone
+  /// counterpart of the web's _quiz_apparier_take partial, and the same tap-not-drag interaction as
+  /// the word bank and the légende labels. Either column may be pictures; that is entirely the
+  /// board widget's business, which is why nothing here branches on it.
+  List<Widget> _buildMatching(QuizQuestion question) {
+    return [
+      Text(question.label,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.ink, height: 1.4)),
+      const SizedBox(height: 6),
+      const Text('Touchez un élément, puis la case où le placer. Retouchez une case remplie pour reprendre son élément.',
+          style: TextStyle(fontSize: 12.5, color: AppColors.faint)),
+      const SizedBox(height: 14),
+      QuizMatchingBoard(
+        pairs: question.matchingPairs,
+        headers: question.matchingHeaders,
+        stateOf: (_) => MatchVisualState.none,
+        placedOf: (pairId) => _matchingChoice(question, _associations[pairId]),
+        onSlotTap: (pairId) => setState(() {
+          if (_associations.containsKey(pairId)) {
+            // A filled slot hands its item back, whatever chip is armed.
+            _associations.remove(pairId);
+          } else if (_activeChoiceKey != null) {
+            _associations[pairId] = _activeChoiceKey!;
+            _activeChoiceKey = null;
+          }
+        }),
+      ),
+      const SizedBox(height: 20),
+      const Text('ÉLÉMENTS À RELIER',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.faint, letterSpacing: .5)),
+      const SizedBox(height: 8),
+      Wrap(spacing: 8, runSpacing: 8, children: _buildMatchingChips(question)),
+      const SizedBox(height: 14),
+      Text('${_associations.length} / ${question.matchingPairs.length} associations faites',
+          style: const TextStyle(fontSize: 12.5, color: AppColors.faint)),
+    ];
+  }
+
+  QuizMatchingChoice? _matchingChoice(QuizQuestion question, String? key) {
+    if (key == null) return null;
+    for (final choice in question.matchingChoices) {
+      if (choice.key == key) return choice;
+    }
+    return null;
+  }
+
+  List<Widget> _buildMatchingChips(QuizQuestion question) {
+    final usedKeys = _associations.values.toSet();
+
+    return question.matchingChoices.map((choice) {
+      final used = usedKeys.contains(choice.key);
+      final isActive = !used && _activeChoiceKey == choice.key;
+
+      // Same chip states as the word bank: armed = blue halo, placed = greyed out.
+      return GestureDetector(
+        onTap: used ? null : () => setState(() => _activeChoiceKey = isActive ? null : choice.key),
+        child: Opacity(
+          opacity: used ? .45 : 1,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: choice.imageUrl != null ? 6 : 14, vertical: choice.imageUrl != null ? 6 : 8),
+            decoration: BoxDecoration(
+              color: used ? AppColors.surfaceAlt : (isActive ? AppColors.blueBg : AppColors.surface),
+              border: Border.all(color: isActive ? AppColors.brand : AppColors.border),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: QuizMatchingItem(
+              text: choice.text,
+              imageUrl: choice.imageUrl,
+              color: used ? AppColors.faint : (isActive ? AppColors.blueTx : AppColors.ink),
+              fontSize: 13.5,
+              strikeThrough: used && choice.imageUrl == null,
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  /// The pairs replayed read-only: each slot green or red, the expected item under the ones that
+  /// went wrong, then the teacher's per-pair feedbacks - the phone counterpart of the web's
+  /// _quiz_attempt_breakdown apparier branch.
+  List<Widget> _buildMatchingCorrection(QuizCorrectionEntry entry) {
+    QuizMatchingChoice? placed(String pairId) {
+      final key = entry.matchingResponses[pairId];
+      if (key == null) return null;
+      for (final choice in entry.matchingChoices) {
+        if (choice.key == key) return choice;
+      }
+      return null;
+    }
+
+    return [
+      QuizMatchingBoard(
+        pairs: entry.matchingPairs,
+        headers: entry.matchingHeaders,
+        stateOf: (pairId) {
+          final right = entry.matchingResults[pairId];
+          if (right == null) return MatchVisualState.none;
+          return right ? MatchVisualState.good : MatchVisualState.bad;
+        },
+        placedOf: placed,
+        reveal: true,
+      ),
+      for (final pair in entry.matchingPairs)
+        if (entry.matchingResults[pair.id] == false && entry.matchingFeedback[pair.id] != null) ...[
+          const SizedBox(height: 6),
+          Text(entry.matchingFeedback[pair.id]!,
+              style: const TextStyle(fontSize: 12.5, color: AppColors.redTx, fontWeight: FontWeight.w600)),
+        ],
+    ];
+  }
+
   String? _choiceText(QuizQuestion question, String? key) {
     if (key == null) return null;
     for (final choice in question.zoneChoices) {
@@ -787,6 +909,8 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
             ..._buildBlankCorrection(entry)
           else if (entry.isZones)
             ..._buildZoneCorrection(entry)
+          else if (entry.isApparier)
+            ..._buildMatchingCorrection(entry)
           else
             ..._buildAnswerCorrection(entry),
           if (entry.explanation != null && !entry.isCorrect) ...[
