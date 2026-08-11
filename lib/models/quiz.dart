@@ -297,6 +297,8 @@ class QuizQuestion {
     required this.numericStatement,
     required this.numericUnit,
     required this.numericUnitRequired,
+    required this.blankIgnoreCase,
+    required this.blankTolerateTypo,
   });
 
   /// 'qcm' | 'qcm_multi' | 'vrai_faux' | 'image' | 'ordre' | 'texte_a_trous' | 'zone' | 'legende'
@@ -335,12 +337,23 @@ class QuizQuestion {
   /// one of the numeric types.
   final String? numericStatement;
 
+  /// What the auto-correction forgives on a typed answer (texte à trous and réponse courte): case
+  /// and accents, and optionally one typo. The accepted variants themselves are deliberately absent
+  /// - they are the answer, and only arrive at correction time.
+  final bool blankIgnoreCase;
+  final bool blankTolerateTypo;
+
   /// The unit the answer is expressed in, and whether the student has to type it themselves. When
   /// they do not, it is shown beside the field and they type only the number.
   final String? numericUnit;
   final bool numericUnitRequired;
 
   bool get isBlanks => type == 'texte_a_trous';
+
+  /// A short answer is one typed word matched against accepted variants. It is stored server-side
+  /// as a texte à trous with a single blank, which is why it travels in the very same
+  /// `blanks` field - the app only has to render one plain field instead of a split statement.
+  bool get isShortAnswer => type == 'reponse_courte';
   bool get isMulti => type == 'qcm_multi';
   bool get isOrder => type == 'ordre';
   bool get isWordBank => blankMode == 'banque';
@@ -390,6 +403,8 @@ class QuizQuestion {
         numericStatement: json['numericStatement'] as String?,
         numericUnit: json['numericUnit'] as String?,
         numericUnitRequired: json['numericUnitRequired'] as bool? ?? false,
+        blankIgnoreCase: json['blankIgnoreCase'] as bool? ?? true,
+        blankTolerateTypo: json['blankTolerateTypo'] as bool? ?? false,
       );
 }
 
@@ -551,6 +566,7 @@ class QuizCorrectionEntry {
   final int numericDecimals;
 
   bool get isBlanks => type == 'texte_a_trous';
+  bool get isShortAnswer => type == 'reponse_courte';
   bool get isZone => type == 'zone';
   bool get isLegende => type == 'legende';
   bool get isZones => isZone || isLegende;

@@ -146,9 +146,14 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     }
     _blankControllers.clear();
 
-    _blanks = List.filled(question.blankCount, '');
-    if (question.isBlanks && !question.isWordBank) {
-      for (var i = 0; i < question.blankCount; i++) {
+    // A short answer is one blank, typed freely - the very same controller/response plumbing the
+    // texte à trous uses, which is what the server stores it as. Its count comes from the type
+    // rather than from the statement: the statement is a question, not a sentence with a hole, so
+    // there are no segments to count (App\Entity\QuizQuestionDefinitionTrait says the same).
+    final blankCount = question.isShortAnswer ? 1 : question.blankCount;
+    _blanks = List.filled(blankCount, '');
+    if (question.isShortAnswer || (question.isBlanks && !question.isWordBank)) {
+      for (var i = 0; i < blankCount; i++) {
         final controller = TextEditingController();
         final index = i;
         controller.addListener(() => _blanks[index] = controller.text.trim());
@@ -199,7 +204,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         widget.attemptId,
         page.position,
         answerIds: answerIds,
-        blanks: question.isBlanks ? _blanks : const [],
+        blanks: question.isBlanks || question.isShortAnswer ? _blanks : const [],
         zones: question.isZone ? _zoneSelected.toList() : const [],
         placements: question.isLegende ? Map.of(_placements) : const {},
         associations: question.isApparier ? Map.of(_associations) : const {},
@@ -317,7 +322,9 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              if (question.isBlanks)
+              if (question.isShortAnswer)
+                ..._buildShortAnswer(question)
+              else if (question.isBlanks)
                 ..._buildBlanks(question)
               else if (question.isZones)
                 ..._buildZones(question)
@@ -654,6 +661,67 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         const SizedBox(height: 14),
         Text('${_placements.length} / ${question.zoneIds.length} étiquettes placées',
             style: const TextStyle(fontSize: 12.5, color: AppColors.faint)),
+      ],
+    ];
+  }
+
+  /// A Réponse courte: the question, and one field to type a word or a short phrase into.
+  ///
+  /// Reuses the blanks' own controller (there is exactly one) so the answer travels in the same
+  /// `blanks` field the server already reads - the type is stored as a texte à trous with a single
+  /// blank, and the app has no reason to know more than that.
+  List<Widget> _buildShortAnswer(QuizQuestion question) {
+    final hint = question.blankIgnoreCase && question.blankTolerateTypo
+        ? 'Majuscules et accents sont ignorés, et une faute de frappe est tolérée.'
+        : question.blankIgnoreCase
+            ? 'Majuscules et accents sont ignorés.'
+            : question.blankTolerateTypo
+                ? 'Une faute de frappe est tolérée.'
+                : 'Réponse comparée exactement : la casse et les accents comptent.';
+
+    return [
+      Text(question.label,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.ink, height: 1.5)),
+      const SizedBox(height: 18),
+      TextField(
+        controller: _blankControllers.isNotEmpty ? _blankControllers.first : null,
+        textCapitalization: TextCapitalization.none,
+        autocorrect: false,
+        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w500, color: AppColors.ink),
+        decoration: const InputDecoration(hintText: 'Tapez votre réponse'),
+      ),
+      const SizedBox(height: 10),
+      Text(hint, style: const TextStyle(fontSize: 12.5, color: AppColors.faint)),
+    ];
+  }
+
+  /// The short-answer correction: what they typed, then every accepted wording - the variants are
+  /// the marking scheme, so a student who wrote something reasonable that was not accepted can see
+  /// it, which is how a teacher finds the variant they forgot.
+  List<Widget> _buildShortAnswerCorrection(QuizCorrectionEntry entry) {
+    final typed = entry.blankResponses.isNotEmpty ? entry.blankResponses.first : '';
+    final accepted = entry.blankExpected.isNotEmpty ? entry.blankExpected.first : const <String>[];
+
+    return [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        decoration: BoxDecoration(
+          color: entry.isCorrect ? AppColors.greenBg : AppColors.redBg,
+          borderRadius: BorderRadius.circular(7),
+        ),
+        child: Text(
+          'Votre réponse : ${typed.isNotEmpty ? typed : '—'}',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: entry.isCorrect ? AppColors.greenTx : AppColors.redTx,
+          ),
+        ),
+      ),
+      if (accepted.isNotEmpty) ...[
+        const SizedBox(height: 6),
+        Text('Réponses acceptées : ${accepted.join(', ')}',
+            style: const TextStyle(fontSize: 12, color: AppColors.faint)),
       ],
     ];
   }
@@ -1008,7 +1076,9 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
             ],
           ),
           const SizedBox(height: 10),
-          if (entry.isBlanks)
+          if (entry.isShortAnswer)
+            ..._buildShortAnswerCorrection(entry)
+          else if (entry.isBlanks)
             ..._buildBlankCorrection(entry)
           else if (entry.isZones)
             ..._buildZoneCorrection(entry)
