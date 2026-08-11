@@ -166,6 +166,58 @@ class QuizBlankSegment {
       );
 }
 
+/// One piece of a Zone/Légende support line: literal text or a tappable zone.
+///
+/// Like the blanks, the server sends the support pre-split into lines and segments so the app
+/// never re-implements the [[id|texte]] marker parsing (App\Util\ZoneTextParser) and cannot
+/// disagree with the grader on which zones exist.
+class QuizZoneSegment {
+  const QuizZoneSegment({required this.isZone, required this.text, required this.id});
+
+  final bool isZone;
+  final String text;
+
+  /// The zone id the answer is expressed in; empty for a text segment.
+  final String id;
+
+  factory QuizZoneSegment.fromJson(Map<String, dynamic> json) => QuizZoneSegment(
+        isZone: json['type'] == 'zone',
+        text: json['value'] as String? ?? '',
+        id: json['id'] as String? ?? '',
+      );
+}
+
+/// A drawn rectangle of an image support, coordinates normalized 0..1 of the displayed image.
+class QuizImageZone {
+  const QuizImageZone({required this.id, required this.x, required this.y, required this.w, required this.h});
+
+  final String id;
+  final double x;
+  final double y;
+  final double w;
+  final double h;
+
+  factory QuizImageZone.fromJson(Map<String, dynamic> json) => QuizImageZone(
+        id: json['id'] as String,
+        x: (json['x'] as num).toDouble(),
+        y: (json['y'] as num).toDouble(),
+        w: (json['w'] as num).toDouble(),
+        h: (json['h'] as num).toDouble(),
+      );
+}
+
+/// One placeable label of a Légende question. The [key] is what gets submitted; a real label's
+/// key is its zone id, a distractor carries a synthetic d0/d1/… key that can never match.
+class QuizZoneChoice {
+  const QuizZoneChoice({required this.key, required this.text});
+
+  final String key;
+  final String text;
+
+  factory QuizZoneChoice.fromJson(Map<String, dynamic> json) =>
+      QuizZoneChoice(key: json['key'] as String, text: json['text'] as String? ?? '');
+}
+
 class QuizQuestion {
   const QuizQuestion({
     required this.type,
@@ -175,9 +227,15 @@ class QuizQuestion {
     required this.blankMode,
     required this.blankSegments,
     required this.wordBank,
+    required this.zoneKind,
+    required this.zoneLines,
+    required this.imageZones,
+    required this.zoneChoices,
+    required this.zoneHintIds,
+    required this.zoneMultiple,
   });
 
-  /// 'qcm' | 'qcm_multi' | 'vrai_faux' | 'image' | 'ordre' | 'texte_a_trous'.
+  /// 'qcm' | 'qcm_multi' | 'vrai_faux' | 'image' | 'ordre' | 'texte_a_trous' | 'zone' | 'legende'.
   final String type;
   final String label;
   final String? imageUrl;
@@ -188,12 +246,34 @@ class QuizQuestion {
   final List<QuizBlankSegment> blankSegments;
   final List<String> wordBank;
 
+  /// 'texte' | 'code' | 'image', null unless [type] is 'zone' or 'legende'.
+  final String? zoneKind;
+  final List<List<QuizZoneSegment>> zoneLines;
+  final List<QuizImageZone> imageZones;
+  final List<QuizZoneChoice> zoneChoices;
+
+  /// Zones left visible when the student asks for the hint - only ever sent in entraînement,
+  /// so an empty list also means "no hint button at all".
+  final List<String> zoneHintIds;
+
+  /// True when a Zone question expects several zones to be tapped.
+  final bool zoneMultiple;
+
   bool get isBlanks => type == 'texte_a_trous';
   bool get isMulti => type == 'qcm_multi';
   bool get isOrder => type == 'ordre';
   bool get isWordBank => blankMode == 'banque';
+  bool get isZone => type == 'zone';
+  bool get isLegende => type == 'legende';
+  bool get isZones => isZone || isLegende;
+  bool get isImageSupport => zoneKind == 'image';
 
   int get blankCount => blankSegments.where((s) => s.isBlank).length;
+
+  /// Every zone id the support carries, whatever the kind.
+  List<String> get zoneIds => isImageSupport
+      ? imageZones.map((z) => z.id).toList()
+      : zoneLines.expand((line) => line).where((s) => s.isZone).map((s) => s.id).toSet().toList();
 
   factory QuizQuestion.fromJson(Map<String, dynamic> json) => QuizQuestion(
         type: json['type'] as String,
@@ -207,8 +287,23 @@ class QuizQuestion {
             .map((e) => QuizBlankSegment.fromJson(e as Map<String, dynamic>))
             .toList(),
         wordBank: (json['wordBank'] as List<dynamic>? ?? []).map((e) => e as String).toList(),
+        zoneKind: json['zoneKind'] as String?,
+        zoneLines: _parseZoneLines(json['zoneLines']),
+        imageZones: (json['imageZones'] as List<dynamic>? ?? [])
+            .map((e) => QuizImageZone.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        zoneChoices: (json['zoneChoices'] as List<dynamic>? ?? [])
+            .map((e) => QuizZoneChoice.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        zoneHintIds: (json['zoneHintIds'] as List<dynamic>? ?? []).map((e) => e as String).toList(),
+        zoneMultiple: json['zoneMultiple'] as bool? ?? false,
       );
 }
+
+List<List<QuizZoneSegment>> _parseZoneLines(dynamic raw) => (raw as List<dynamic>? ?? [])
+    .map((line) =>
+        (line as List<dynamic>).map((e) => QuizZoneSegment.fromJson(e as Map<String, dynamic>)).toList())
+    .toList();
 
 class QuizQuestionPage {
   const QuizQuestionPage({
@@ -282,6 +377,17 @@ class QuizCorrectionEntry {
     required this.blankResponses,
     required this.blankResults,
     required this.blankExpected,
+    required this.zoneKind,
+    required this.zoneLines,
+    required this.imageZones,
+    required this.imageUrl,
+    required this.zoneClicked,
+    required this.zonePlacements,
+    required this.zoneCorrectIds,
+    required this.zoneResults,
+    required this.zoneLabels,
+    required this.zoneChoices,
+    required this.zoneFeedback,
   });
 
   final String label;
@@ -293,22 +399,78 @@ class QuizCorrectionEntry {
   final List<bool> blankResults;
   final List<List<String>> blankExpected;
 
-  bool get isBlanks => type == 'texte_a_trous';
+  final String? zoneKind;
+  final List<List<QuizZoneSegment>> zoneLines;
+  final List<QuizImageZone> imageZones;
+  final String? imageUrl;
 
-  factory QuizCorrectionEntry.fromJson(Map<String, dynamic> json) => QuizCorrectionEntry(
-        label: json['label'] as String? ?? '',
-        type: json['type'] as String? ?? '',
-        isCorrect: json['isCorrect'] as bool? ?? false,
-        explanation: json['explanation'] as String?,
-        answers: (json['answers'] as List<dynamic>? ?? [])
-            .map((e) => QuizCorrectionAnswer.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        blankResponses: (json['blankResponses'] as List<dynamic>? ?? []).map((e) => e as String).toList(),
-        blankResults: (json['blankResults'] as List<dynamic>? ?? []).map((e) => e as bool).toList(),
-        blankExpected: (json['blankExpected'] as List<dynamic>? ?? [])
-            .map((e) => (e as List<dynamic>).map((v) => v as String).toList())
-            .toList(),
-      );
+  /// Zone question: the zone ids the student tapped.
+  final List<String> zoneClicked;
+
+  /// Légende question: zone id => the choice key the student placed on it.
+  final Map<String, String> zonePlacements;
+
+  final List<String> zoneCorrectIds;
+
+  /// Légende: zone id => right/wrong.
+  final Map<String, bool> zoneResults;
+
+  /// Légende: zone id => the label that belonged there.
+  final Map<String, String> zoneLabels;
+  final List<QuizZoneChoice> zoneChoices;
+
+  /// Zone: zone id tapped by mistake => the teacher's "why this one is wrong" text.
+  final Map<String, String> zoneFeedback;
+
+  bool get isBlanks => type == 'texte_a_trous';
+  bool get isZone => type == 'zone';
+  bool get isLegende => type == 'legende';
+  bool get isZones => isZone || isLegende;
+  bool get isImageSupport => zoneKind == 'image';
+
+  factory QuizCorrectionEntry.fromJson(Map<String, dynamic> json) {
+    // zoneResponses mirrors how it was stored: a JSON array of tapped ids for a Zone question, an
+    // object of zone => choice for a Légende. An empty PHP array serializes as [] either way, so
+    // both readings have to accept both shapes.
+    final rawResponses = json['zoneResponses'];
+    final zoneClicked = rawResponses is List ? rawResponses.map((e) => e.toString()).toList() : <String>[];
+    final zonePlacements = rawResponses is Map
+        ? rawResponses.map((k, v) => MapEntry(k.toString(), v.toString()))
+        : <String, String>{};
+
+    Map<String, T> mapOf<T>(dynamic raw) =>
+        raw is Map ? raw.map((k, v) => MapEntry(k.toString(), v as T)) : <String, T>{};
+
+    return QuizCorrectionEntry(
+      label: json['label'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      isCorrect: json['isCorrect'] as bool? ?? false,
+      explanation: json['explanation'] as String?,
+      answers: (json['answers'] as List<dynamic>? ?? [])
+          .map((e) => QuizCorrectionAnswer.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      blankResponses: (json['blankResponses'] as List<dynamic>? ?? []).map((e) => e as String).toList(),
+      blankResults: (json['blankResults'] as List<dynamic>? ?? []).map((e) => e as bool).toList(),
+      blankExpected: (json['blankExpected'] as List<dynamic>? ?? [])
+          .map((e) => (e as List<dynamic>).map((v) => v as String).toList())
+          .toList(),
+      zoneKind: json['zoneKind'] as String?,
+      zoneLines: _parseZoneLines(json['zoneLines']),
+      imageZones: (json['imageZones'] as List<dynamic>? ?? [])
+          .map((e) => QuizImageZone.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      imageUrl: json['imageUrl'] as String?,
+      zoneClicked: zoneClicked,
+      zonePlacements: zonePlacements,
+      zoneCorrectIds: (json['zoneCorrectIds'] as List<dynamic>? ?? []).map((e) => e as String).toList(),
+      zoneResults: mapOf<bool>(json['zoneResults']),
+      zoneLabels: mapOf<String>(json['zoneLabels']),
+      zoneChoices: (json['zoneChoices'] as List<dynamic>? ?? [])
+          .map((e) => QuizZoneChoice.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      zoneFeedback: mapOf<String>(json['zoneFeedback']),
+    );
+  }
 }
 
 class QuizResult {
