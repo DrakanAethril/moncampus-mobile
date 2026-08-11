@@ -294,6 +294,9 @@ class QuizQuestion {
     required this.matchingHeaders,
     required this.matchingPairs,
     required this.matchingChoices,
+    required this.numericStatement,
+    required this.numericUnit,
+    required this.numericUnitRequired,
   });
 
   /// 'qcm' | 'qcm_multi' | 'vrai_faux' | 'image' | 'ordre' | 'texte_a_trous' | 'zone' | 'legende'
@@ -327,6 +330,16 @@ class QuizQuestion {
   final List<QuizMatchingPair> matchingPairs;
   final List<QuizMatchingChoice> matchingChoices;
 
+  /// Numérique / Calculée: the statement already rendered with *this* student's drawn values, so
+  /// the app never re-implements the {v} substitution the grader owns. Null unless the question is
+  /// one of the numeric types.
+  final String? numericStatement;
+
+  /// The unit the answer is expressed in, and whether the student has to type it themselves. When
+  /// they do not, it is shown beside the field and they type only the number.
+  final String? numericUnit;
+  final bool numericUnitRequired;
+
   bool get isBlanks => type == 'texte_a_trous';
   bool get isMulti => type == 'qcm_multi';
   bool get isOrder => type == 'ordre';
@@ -335,6 +348,7 @@ class QuizQuestion {
   bool get isLegende => type == 'legende';
   bool get isZones => isZone || isLegende;
   bool get isApparier => type == 'apparier';
+  bool get isNumeric => type == 'numerique' || type == 'calculee';
   bool get isImageSupport => zoneKind == 'image';
 
   int get blankCount => blankSegments.where((s) => s.isBlank).length;
@@ -373,6 +387,9 @@ class QuizQuestion {
         matchingChoices: (json['matchingChoices'] as List<dynamic>? ?? [])
             .map((e) => QuizMatchingChoice.fromJson(e as Map<String, dynamic>))
             .toList(),
+        numericStatement: json['numericStatement'] as String?,
+        numericUnit: json['numericUnit'] as String?,
+        numericUnitRequired: json['numericUnitRequired'] as bool? ?? false,
       );
 }
 
@@ -470,6 +487,12 @@ class QuizCorrectionEntry {
     required this.matchingResponses,
     required this.matchingResults,
     required this.matchingFeedback,
+    required this.numericStatement,
+    required this.numericRaw,
+    required this.numericExpected,
+    required this.numericMargin,
+    required this.numericUnit,
+    required this.numericDecimals,
   });
 
   final String label;
@@ -518,11 +541,21 @@ class QuizCorrectionEntry {
   /// pair id the student got wrong => the teacher's "why these two go together" text.
   final Map<String, String> matchingFeedback;
 
+  /// Numérique / Calculée at correction time: the statement as this student read it, what they
+  /// typed verbatim, and what was expected of them - the three things a correction lines up.
+  final String? numericStatement;
+  final String? numericRaw;
+  final double? numericExpected;
+  final double? numericMargin;
+  final String? numericUnit;
+  final int numericDecimals;
+
   bool get isBlanks => type == 'texte_a_trous';
   bool get isZone => type == 'zone';
   bool get isLegende => type == 'legende';
   bool get isZones => isZone || isLegende;
   bool get isApparier => type == 'apparier';
+  bool get isNumeric => type == 'numerique' || type == 'calculee';
   bool get isImageSupport => zoneKind == 'image';
 
   factory QuizCorrectionEntry.fromJson(Map<String, dynamic> json) {
@@ -578,6 +611,12 @@ class QuizCorrectionEntry {
       matchingResponses: mapOf<String>(json['matchingResponses']),
       matchingResults: mapOf<bool>(json['matchingResults']),
       matchingFeedback: mapOf<String>(json['matchingFeedback']),
+      numericStatement: json['numericStatement'] as String?,
+      numericRaw: json['numericRaw'] as String?,
+      numericExpected: (json['numericExpected'] as num?)?.toDouble(),
+      numericMargin: (json['numericMargin'] as num?)?.toDouble(),
+      numericUnit: json['numericUnit'] as String?,
+      numericDecimals: json['numericDecimals'] as int? ?? 2,
     );
   }
 }
