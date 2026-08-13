@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
+import '../models/video_cue.dart';
 import '../models/work_item.dart';
 import '../theme/app_theme.dart';
+import 'video_cue_overlay.dart';
 
 /// One video file of a Watching travail, inside the consultation sheet (créas 5A).
 ///
@@ -29,8 +31,9 @@ class WorkVideoPlayer extends StatefulWidget {
     super.key,
     required this.file,
     required this.onProgress,
-    this.onPosition,
-    this.onController,
+    this.assignmentId,
+    this.cues = const [],
+    this.onCueAnswered,
   });
 
   final WorkVideoFile file;
@@ -38,12 +41,15 @@ class WorkVideoPlayer extends StatefulWidget {
   /// Reports the furthest point reached, as a percentage. Called only when it has moved.
   final void Function(int percent) onProgress;
 
-  /// Every position event, credited or not - the cue markers need the real playhead, including
-  /// after a jump they must not fire on.
-  final void Function(Duration position, bool playing)? onPosition;
+  /// The travail this file belongs to - only needed to answer a marker.
+  final int? assignmentId;
 
-  /// Hands the controller out once ready, so an overlay can pause the video on a marker.
-  final void Function(VideoPlayerController controller)? onController;
+  /// The interactive video's markers, when this travail has any (créas 5B). Empty for a plain
+  /// watching travail, and the overlay then never builds.
+  final List<VideoCuePoint> cues;
+
+  /// Called once a marker has been answered, so the caller can refresh the list.
+  final void Function(int cueId)? onCueAnswered;
 
   @override
   State<WorkVideoPlayer> createState() => _WorkVideoPlayerState();
@@ -62,6 +68,11 @@ class _WorkVideoPlayerState extends State<WorkVideoPlayer> {
   DateTime _lastReportedAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _failed = false;
   bool _loading = false;
+
+  /// The playhead as last reported, handed to the marker overlay - it is what decides whether a
+  /// marker was walked onto or skipped past.
+  Duration _position = Duration.zero;
+  bool _playing = false;
 
   @override
   void initState() {
@@ -125,7 +136,6 @@ class _WorkVideoPlayerState extends State<WorkVideoPlayer> {
       _controller = created;
       _loading = false;
     });
-    widget.onController?.call(created);
     await created.play();
   }
 
@@ -134,7 +144,8 @@ class _WorkVideoPlayerState extends State<WorkVideoPlayer> {
     if (controller == null || !controller.value.isInitialized) return;
 
     final value = controller.value;
-    widget.onPosition?.call(value.position, value.isPlaying);
+    _position = value.position;
+    _playing = value.isPlaying;
 
     if (!value.isPlaying) {
       _flush();
@@ -224,6 +235,19 @@ class _WorkVideoPlayerState extends State<WorkVideoPlayer> {
                               color: Colors.white.withOpacity(0.92),
                             ),
                     ),
+                  ),
+                // Over the picture, never beside it: the question is about what is on screen.
+                if (widget.cues.isNotEmpty && widget.assignmentId != null && ready)
+                  VideoCueOverlay(
+                    assignmentId: widget.assignmentId!,
+                    fileId: widget.file.id,
+                    cues: widget.cues,
+                    position: _position,
+                    playing: _playing,
+                    onPause: () => controller.pause(),
+                    onResume: () => controller.play(),
+                    onSeek: (to) => controller.seekTo(to),
+                    onAnswered: widget.onCueAnswered ?? (_) {},
                   ),
               ],
             ),

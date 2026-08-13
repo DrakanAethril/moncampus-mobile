@@ -4,7 +4,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/work_item.dart';
 import '../screens/work_screen.dart' show WorkTag;
+import '../models/video_cue.dart';
 import '../services/auth_service.dart';
+import '../services/video_cue_service.dart';
 import '../services/work_service.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
@@ -46,10 +48,14 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
   WorkDetail? _detail;
   String? _error;
 
+  /// The interactive video's markers. Empty for every other travail.
+  List<VideoCuePoint> _cues = const [];
+
   @override
   void initState() {
     super.initState();
     _load();
+    _loadCues();
   }
 
   Future<void> _load() async {
@@ -80,6 +86,23 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
           token, widget.item.id, fileId, percent);
     } catch (_) {
       // Deliberately ignored - see above.
+    }
+  }
+
+  /// The markers of the interactive video, loaded once with the sheet.
+  ///
+  /// Empty for a plain watching travail - the endpoint answers an empty list, and the overlay then
+  /// never builds. Loading them up front rather than at the first play is what lets a marker fire
+  /// on the very first second of the file.
+  Future<void> _loadCues() async {
+    final token = context.read<AuthService>().token;
+    if (token == null) return;
+
+    try {
+      final cues = await VideoCueService().fetchCues(token, widget.item.id);
+      if (mounted) setState(() => _cues = cues);
+    } catch (_) {
+      // A video whose markers cannot be read stays watchable - it simply asks nothing.
     }
   }
 
@@ -230,7 +253,11 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
                 // recycles one player's state onto another file and credits the wrong recording.
                 key: ValueKey('video-${file.id}'),
                 file: file,
+                assignmentId: widget.item.id,
+                cues: _cues,
                 onProgress: (percent) => _reportWatching(file.id, percent),
+                // An answered marker must not be asked again on a second viewing.
+                onCueAnswered: (_) => _loadCues(),
               ),
             ],
           ],
