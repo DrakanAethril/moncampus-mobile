@@ -109,6 +109,7 @@ class WorkDetail {
     required this.expectations,
     required this.attachments,
     required this.audioFiles,
+    required this.videoFiles,
     this.description,
     this.givenAt,
   });
@@ -128,6 +129,9 @@ class WorkDetail {
         audioFiles: (json['audioFiles'] as List<dynamic>? ?? const [])
             .map((e) => WorkAudioFile.fromJson(e as Map<String, dynamic>))
             .toList(),
+        videoFiles: (json['videoFiles'] as List<dynamic>? ?? const [])
+            .map((e) => WorkVideoFile.fromJson(e as Map<String, dynamic>))
+            .toList(),
       );
 
   final WorkItem item;
@@ -139,6 +143,9 @@ class WorkDetail {
   /// The files of a Listening travail: the common ones and this student's own. Empty for every
   /// other nature.
   final List<WorkAudioFile> audioFiles;
+
+  /// The files to watch. Empty for anything but a Watching travail.
+  final List<WorkVideoFile> videoFiles;
 }
 
 /// One audio file to listen to, with how much of it has already been heard.
@@ -338,4 +345,41 @@ class WorkProgress {
     if (total == null || total == 0) return 0;
     return (done / total!).clamp(0, 1).toDouble();
   }
+}
+
+/// One video file to watch, with how much of it has already been seen.
+///
+/// The same reading as [WorkAudioFile]: [percent] is the furthest point ever reached, not where the
+/// last playback stopped. The server keeps a maximum (App\Entity\VideoWatchProgress) and the
+/// player resumes crediting from it, so a student who watched half yesterday does not have to
+/// replay the whole thing in one go.
+class WorkVideoFile {
+  const WorkVideoFile({
+    required this.id,
+    required this.name,
+    required this.duration,
+    required this.durationSeconds,
+    required this.percent,
+    required this.url,
+  });
+
+  factory WorkVideoFile.fromJson(Map<String, dynamic> json) => WorkVideoFile(
+        id: json['id'] as int,
+        name: json['name'] as String? ?? '',
+        duration: json['duration'] as String? ?? '',
+        durationSeconds: (json['durationSeconds'] as num?)?.toDouble() ?? 0,
+        percent: json['percent'] as int? ?? 0,
+        url: json['url'] as String? ?? '',
+      );
+
+  final int id;
+  final String name;
+  final String duration;
+
+  /// Read by the browser on upload, not by a server-side probe - it only draws a bar and places
+  /// the cue markers on a timeline.
+  final double durationSeconds;
+
+  final int percent;
+  final String url;
 }
