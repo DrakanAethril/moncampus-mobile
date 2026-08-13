@@ -10,6 +10,7 @@ import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import '../utils/french_date.dart';
 import 'work_audio_player.dart';
+import 'work_video_player.dart';
 
 /// Opens the consultation sheet of one travail (design_handoff_mobile 4c).
 Future<void> showWorkDetailSheet(BuildContext context, WorkItem item) {
@@ -76,6 +77,18 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
 
     try {
       await _workService.reportListenProgress(
+          token, widget.item.id, fileId, percent);
+    } catch (_) {
+      // Deliberately ignored - see above.
+    }
+  }
+
+  Future<void> _reportWatching(int fileId, int percent) async {
+    final token = context.read<AuthService>().token;
+    if (token == null) return;
+
+    try {
+      await _workService.reportWatchProgress(
           token, widget.item.id, fileId, percent);
     } catch (_) {
       // Deliberately ignored - see above.
@@ -206,8 +219,25 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
               ),
             ],
           ],
-          if (detail.expectations.isNotEmpty) ...[
+          if (detail.videoFiles.isNotEmpty) ...[
             if (description.isNotEmpty || detail.audioFiles.isNotEmpty)
+              const SizedBox(height: 15),
+            _SectionLabel(label: 'À visionner · ${detail.videoFiles.length}'),
+            for (final file in detail.videoFiles) ...[
+              const SizedBox(height: 8),
+              WorkVideoPlayer(
+                // Keyed on the file, same reason as the audio player above: without it Flutter
+                // recycles one player's state onto another file and credits the wrong recording.
+                key: ValueKey('video-${file.id}'),
+                file: file,
+                onProgress: (percent) => _reportWatching(file.id, percent),
+              ),
+            ],
+          ],
+          if (detail.expectations.isNotEmpty) ...[
+            if (description.isNotEmpty ||
+                detail.audioFiles.isNotEmpty ||
+                detail.videoFiles.isNotEmpty)
               const SizedBox(height: 15),
             _SectionLabel(
                 label: 'Dépôts demandés · ${detail.expectations.length}'),

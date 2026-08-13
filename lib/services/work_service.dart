@@ -98,6 +98,33 @@ class WorkService {
         percent;
   }
 
+  /// The watching reported by the mobile player, twin of reportListenProgress() one media over.
+  ///
+  /// Same ratchet on the server (App\Service\VideoWatchTracker): only the maximum is kept, so a
+  /// report that went missing costs nothing but the credit of that moment, which the next one
+  /// makes up.
+  Future<int> reportWatchProgress(
+    String token,
+    int assignmentId,
+    int fileId,
+    int percent,
+  ) async {
+    final response = await _client.post(
+      Uri.parse(
+          '${ApiConfig.baseUrl}/api/student-work/$assignmentId/video/$fileId/watch-progress'),
+      headers: {..._headers(token), 'Content-Type': 'application/json'},
+      body: jsonEncode({'percent': percent}),
+    );
+
+    if (response.statusCode != 200) {
+      throw WorkException("La progression de visionnage n'a pas pu être envoyée.");
+    }
+
+    return (jsonDecode(response.body) as Map<String, dynamic>)['percent']
+            as int? ??
+        percent;
+  }
+
   Map<String, String> _headers(String token) => {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',

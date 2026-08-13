@@ -16,7 +16,9 @@ import '../theme/app_theme.dart';
 import '../utils/french_date.dart';
 import '../widgets/app_header.dart';
 import '../widgets/work_detail_sheet.dart';
+import 'course_space_screen.dart';
 import 'quiz_live_join_screen.dart';
+import 'quiz_screen.dart';
 import 'quiz_take_screen.dart';
 
 /// Accueil (design_handoff_mobile 4a): the date and the greeting, the next class, the "Travaux"
@@ -127,6 +129,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final user = context.watch<AuthService>().currentUser;
     final work = _board?.items ?? const <WorkItem>[];
+    // Both shortcuts lead to student-only areas; a teacher opening them would meet a 403.
+    final isStudent = user?.roles.contains('ROLE_STUDENT') ?? false;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -148,6 +152,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _Greeting(user: user),
                   const SizedBox(height: 14),
+                  if (isStudent) ...[
+                    _ShortcutRow(
+                      onCourses: _openCourses,
+                      onQuiz: _openQuiz,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
                   if (_activeLiveSession != null) ...[
                     _LiveContestBanner(
                       session: _activeLiveSession!,
@@ -228,6 +239,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
     await showWorkDetailSheet(context, item);
     if (mounted) await _loadToday();
+  }
+
+  void _openCourses() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CourseSpaceScreen()));
+  }
+
+  /// The Quiz hub - the évaluations and the entraînement libre of the class, which is not the same
+  /// list as the travaux. Its screen shipped with the quiz feature and nothing ever pushed it.
+  void _openQuiz() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QuizScreen()));
   }
 
   Future<void> _launchQuiz(WorkItem item) async {
@@ -657,6 +678,62 @@ class _LiveContestBanner extends StatelessWidget {
                       weight: FontWeight.w700,
                       color: AppColors.navy)),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Two doors the tab bar has no room for: « Mes cours » and « Quiz ».
+///
+/// The bar stays at four tabs on purpose (design_handoff_mobile, principe 4), so these live on the
+/// home screen - which is where a student lands anyway, and where the day's own cards already sit.
+class _ShortcutRow extends StatelessWidget {
+  const _ShortcutRow({required this.onCourses, required this.onQuiz});
+
+  final VoidCallback onCourses;
+  final VoidCallback onQuiz;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: _ShortcutTile(icon: Icons.menu_book_outlined, label: 'Mes cours', onTap: onCourses)),
+        const SizedBox(width: 10),
+        Expanded(child: _ShortcutTile(icon: Icons.quiz_outlined, label: 'Quiz', onTap: onQuiz)),
+      ],
+    );
+  }
+}
+
+class _ShortcutTile extends StatelessWidget {
+  const _ShortcutTile({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: AppColors.gold),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(label,
+                  style: AppFont.sans(size: 13, weight: FontWeight.w700, color: AppColors.ink)),
+            ),
+            const Icon(Icons.chevron_right, size: 18, color: AppColors.muted),
           ],
         ),
       ),

@@ -61,6 +61,11 @@ dependencies:
   # there is nothing to download to a temp file first. just_audio is used for its position stream,
   # which is what the listen tracking is measured from.
   just_audio: ^0.9.40
+  # Watching travaux (créas 5A) and the interactive video (5B). The file is streamed straight from
+  # its delivery URL like the audio above - no Bearer header, so nothing to download first. What is
+  # used of it is the position stream: the watch tracking and the cue markers are both measured
+  # from it.
+  video_player: ^2.9.2
 
 dev_dependencies:
   flutter_test:
