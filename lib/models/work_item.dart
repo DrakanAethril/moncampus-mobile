@@ -45,6 +45,7 @@ class WorkItem {
     this.subjectId,
     this.teacher,
     this.quizInstanceId,
+    this.surveyCampaignId,
     this.questionCount,
     this.minimumScorePercent,
     this.readingUrl,
@@ -62,6 +63,7 @@ class WorkItem {
         subjectId: json['subjectId'] as int?,
         teacher: json['teacher'] as String?,
         quizInstanceId: json['quizInstanceId'] as int?,
+        surveyCampaignId: json['surveyCampaignId'] as int?,
         questionCount: json['questionCount'] as int?,
         minimumScorePercent: (json['minimumScorePercent'] as num?)?.toDouble(),
         readingUrl: json['readingUrl'] as String?,
@@ -81,6 +83,10 @@ class WorkItem {
   final int? subjectId;
   final String? teacher;
   final int? quizInstanceId;
+
+  /// The survey campaign a Survey work asks to answer - the counterpart of [quizInstanceId], and
+  /// what the detail sheet opens the passation with.
+  final int? surveyCampaignId;
   final int? questionCount;
   final double? minimumScorePercent;
   final String? readingUrl;

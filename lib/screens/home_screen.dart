@@ -5,10 +5,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/app_user.dart';
 import '../models/lesson_session.dart';
 import '../models/quiz_live_state.dart';
+import '../models/survey.dart';
 import '../models/work_item.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_live_service.dart';
 import '../services/quiz_service.dart';
+import '../services/survey_service.dart';
 import '../services/timetable_service.dart';
 import '../services/work_service.dart';
 import '../theme/app_icons.dart';
@@ -18,6 +20,8 @@ import '../widgets/app_header.dart';
 import '../widgets/work_detail_sheet.dart';
 import 'course_space_screen.dart';
 import 'quiz_live_join_screen.dart';
+import 'survey_screen.dart';
+import 'survey_take_screen.dart';
 import 'quiz_screen.dart';
 import 'quiz_take_screen.dart';
 
@@ -49,10 +53,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final _timetableService = TimetableService();
   final _quizLiveService = QuizLiveService();
   final _workService = WorkService();
+  final _surveyService = SurveyService();
 
   List<LessonSession>? _todaySessions;
   QuizLiveActiveSession? _activeLiveSession;
   WorkBoard? _board;
+
+  /// The surveys still owed - loaded for **every** role, unlike the work board: a teacher or a
+  /// tutor aimed at by a satisfaction survey has no travail à faire at all.
+  List<SurveySummary> _pendingSurveys = const [];
   bool _loading = true;
 
   /// How many travaux the home block holds before sending on to the Travaux tab.
@@ -93,6 +102,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     ]);
 
+    // Asked for separately rather than in the wait above: it is the one call that is not
+    // student-only, so folding it into that conditional list would tie it to a role it does not
+    // have.
+    final surveys = await _surveyService
+        .fetchPending(token)
+        .catchError((_) => const <SurveySummary>[]);
+
     if (!mounted) return;
 
     final today = DateTime(now.year, now.month, now.day);
@@ -105,8 +121,26 @@ class _HomeScreenState extends State<HomeScreen> {
       _todaySessions = todaySessions;
       _activeLiveSession = isStudent ? results[1] as QuizLiveActiveSession? : null;
       _board = isStudent ? results[2] as WorkBoard : null;
+      _pendingSurveys = surveys;
       _loading = false;
     });
+  }
+
+  /// « Mes sondages » in full - offered only when more than one is waiting, since with a single one
+  /// the card already *is* the list.
+  Future<void> _openSurveyList() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SurveyScreen()));
+    if (mounted) await _loadToday();
+  }
+
+  Future<void> _openSurvey(SurveySummary survey) async {
+    final answered = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => SurveyTakeScreen(surveyId: survey.id, surveyName: survey.name),
+      ),
+    );
+
+    if (answered == true && mounted) await _loadToday();
   }
 
   LessonSession? get _nextSession {
@@ -156,6 +190,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     _ShortcutRow(
                       onCourses: _openCourses,
                       onQuiz: _openQuiz,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  // « Sondage en attente » - shown to every role, because a survey addressed to a
+                  // teacher, a member of staff or a tutor has no travail à faire at all, and this
+                  // card plus « Mes sondages » are then their only door
+                  // (design/validated/surveys.md §8).
+                  if (_pendingSurveys.isNotEmpty) ...[
+                    _PendingSurveyCard(
+                      survey: _pendingSurveys.first,
+                      others: _pendingSurveys.length - 1,
+                      onAnswer: () => _openSurvey(_pendingSurveys.first),
+                      onSeeAll: _pendingSurveys.length > 1 ? _openSurveyList : null,
                     ),
                     const SizedBox(height: 14),
                   ],
@@ -736,6 +783,81 @@ class _ShortcutTile extends StatelessWidget {
             const Icon(Icons.chevron_right, size: 18, color: AppColors.muted),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// « Sondage en attente » on the home screen.
+///
+/// Shown to every role on purpose: a survey reaches a student through their travail à faire, but a
+/// teacher, a member of staff or a tutor has none at all, and this card is then their only door
+/// (design/validated/surveys.md §8).
+///
+/// It says how many questions and by when, and nothing of the content: a card that summarised the
+/// survey would be read instead of it.
+class _PendingSurveyCard extends StatelessWidget {
+  const _PendingSurveyCard({
+    required this.survey,
+    required this.others,
+    required this.onAnswer,
+    this.onSeeAll,
+  });
+
+  final SurveySummary survey;
+
+  /// How many more are waiting behind this one.
+  final int others;
+  final VoidCallback onAnswer;
+  final VoidCallback? onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final meta = [
+      '${survey.questionCount} question${survey.questionCount > 1 ? 's' : ''}',
+      if (survey.closesAt != null) 'avant le ${FrenchDate.short(survey.closesAt!)}',
+      if (others > 0) 'et $others autre${others > 1 ? 's' : ''}',
+    ].join(' · ');
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Sondage en attente',
+                    style: AppFont.sans(
+                        size: 11, weight: FontWeight.w700, color: AppColors.faint)),
+                const SizedBox(height: 4),
+                Text(survey.name,
+                    style: AppFont.sans(
+                        size: 14.5, weight: FontWeight.w600, color: AppColors.ink)),
+                const SizedBox(height: 2),
+                Text(meta, style: AppFont.sans(size: 12, color: AppColors.faint)),
+                if (onSeeAll != null) ...[
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: onSeeAll,
+                    child: Text('Tout voir →',
+                        style: AppFont.sans(
+                            size: 12,
+                            weight: FontWeight.w600,
+                            color: AppColors.brandStrong)),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          FilledButton(onPressed: onAnswer, child: const Text('Répondre')),
+        ],
       ),
     );
   }

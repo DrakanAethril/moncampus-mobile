@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/work_item.dart';
+import '../screens/survey_take_screen.dart';
 import '../screens/work_screen.dart' show WorkTag;
 import '../models/video_cue.dart';
 import '../services/auth_service.dart';
@@ -283,13 +284,16 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
               _AttachmentRow(attachment: attachment),
             ],
           ],
-          // A survey is answered on the web for now - and saying so is the whole point of this
-          // panel: without it the row is a dead end, since a survey carries no deposit, no file and
-          // no « marquer comme fait » (its proof of completion is the response itself). Same shape
-          // as the "Dépôt sur le web" pill above, which says why there is no button either.
-          if (item.nature == 'survey') ...[
+          // A survey is answered right here now that the passation exists. It stays its own screen
+          // rather than an inline form: the anonymity notice has to be read before the first
+          // question, and it does not fit in a sheet the student scrolls past.
+          if (item.nature == 'survey' && item.surveyCampaignId != null) ...[
             const SizedBox(height: 15),
-            const _AnswerOnWebPanel(),
+            _AnswerSurveyPanel(
+              campaignId: item.surveyCampaignId!,
+              title: item.title,
+              onAnswered: _load,
+            ),
           ],
           if (detail.givenAt != null) ...[
             const SizedBox(height: 15),
@@ -399,13 +403,22 @@ class _ExpectationRow extends StatelessWidget {
   }
 }
 
-/// "Répondre sur le site" - the survey's counterpart of the deposit pill below.
+/// « Répondre au sondage » - what the "Dépôt sur le web" pill is for a deposit, except this one is
+/// a real button now.
 ///
-/// A survey is the one nature with no way to finish it from here yet: it has no deposit to hand in
-/// and no « marquer comme fait » (deliberately - only the response settles it), so the row would be
-/// a dead end without this. It is a net, not a feature: the native passation lands in its own lot.
-class _AnswerOnWebPanel extends StatelessWidget {
-  const _AnswerOnWebPanel();
+/// A survey has no deposit to hand in and no « marquer comme fait » - deliberately, since only the
+/// response settles it - so without this the row would be a dead end. The passation opens as its own
+/// screen because the anonymity notice must be read before the first question.
+class _AnswerSurveyPanel extends StatelessWidget {
+  const _AnswerSurveyPanel({
+    required this.campaignId,
+    required this.title,
+    required this.onAnswered,
+  });
+
+  final int campaignId;
+  final String title;
+  final VoidCallback onAnswered;
 
   @override
   Widget build(BuildContext context) {
@@ -416,30 +429,30 @@ class _AnswerOnWebPanel extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const AppIcon(AppIcons.laptop,
               size: 14, color: AppColors.brandStrong, strokeWidth: 2.4),
           const SizedBox(width: 9),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Répondre sur le site',
-                  style: AppFont.sans(
-                      size: 12.5,
-                      weight: FontWeight.w600,
-                      color: AppColors.brandStrong),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'Ce sondage se répond depuis un navigateur, dans « Mes sondages ».',
-                  style: AppFont.sans(
-                      size: 12, color: AppColors.muted, height: 1.5),
-                ),
-              ],
+            child: Text(
+              'Ce travail se termine en répondant au sondage.',
+              style:
+                  AppFont.sans(size: 12, color: AppColors.muted, height: 1.5),
             ),
+          ),
+          const SizedBox(width: 9),
+          FilledButton(
+            onPressed: () async {
+              final answered = await Navigator.of(context).push<bool>(
+                MaterialPageRoute(
+                  builder: (_) => SurveyTakeScreen(
+                      surveyId: campaignId, surveyName: title),
+                ),
+              );
+              if (answered == true) onAnswered();
+            },
+            child: const Text('Répondre'),
           ),
         ],
       ),
