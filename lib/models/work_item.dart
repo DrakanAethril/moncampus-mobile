@@ -40,6 +40,7 @@ class WorkItem {
     required this.state,
     required this.dueDate,
     required this.action,
+    this.nature = '',
     this.subject,
     this.subjectId,
     this.teacher,
@@ -56,6 +57,7 @@ class WorkItem {
         state: WorkState.parse(json['state'] as String?),
         dueDate: DateTime.parse(json['dueDate'] as String).toLocal(),
         action: WorkAction.parse(json['action'] as String?),
+        nature: json['nature'] as String? ?? '',
         subject: json['subject'] as String?,
         subjectId: json['subjectId'] as int?,
         teacher: json['teacher'] as String?,
@@ -71,6 +73,10 @@ class WorkItem {
   final WorkState state;
   final DateTime dueDate;
   final WorkAction action;
+
+  /// App\Enum\AssignmentNature's value, as TeacherWorkItem already carries it. Read for the one
+  /// nature the phone cannot finish yet: a survey, whose sheet says where it is answered instead.
+  final String nature;
   final String? subject;
   final int? subjectId;
   final String? teacher;
