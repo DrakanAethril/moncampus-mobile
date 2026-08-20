@@ -215,6 +215,7 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
       );
     }
 
+    final item = detail.item;
     final description = detail.description?.trim() ?? '';
 
     return SingleChildScrollView(
@@ -281,6 +282,14 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
               const SizedBox(height: 8),
               _AttachmentRow(attachment: attachment),
             ],
+          ],
+          // A survey is answered on the web for now - and saying so is the whole point of this
+          // panel: without it the row is a dead end, since a survey carries no deposit, no file and
+          // no « marquer comme fait » (its proof of completion is the response itself). Same shape
+          // as the "Dépôt sur le web" pill above, which says why there is no button either.
+          if (item.nature == 'survey') ...[
+            const SizedBox(height: 15),
+            const _AnswerOnWebPanel(),
           ],
           if (detail.givenAt != null) ...[
             const SizedBox(height: 15),
@@ -387,6 +396,54 @@ class _ExpectationRow extends StatelessWidget {
       if (expectation.dueDate != null) FrenchDate.short(expectation.dueDate!),
       if (expectation.dueDate != null) FrenchDate.time(expectation.dueDate!),
     ].join(' · ');
+  }
+}
+
+/// "Répondre sur le site" - the survey's counterpart of the deposit pill below.
+///
+/// A survey is the one nature with no way to finish it from here yet: it has no deposit to hand in
+/// and no « marquer comme fait » (deliberately - only the response settles it), so the row would be
+/// a dead end without this. It is a net, not a feature: the native passation lands in its own lot.
+class _AnswerOnWebPanel extends StatelessWidget {
+  const _AnswerOnWebPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.blueSoft,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const AppIcon(AppIcons.laptop,
+              size: 14, color: AppColors.brandStrong, strokeWidth: 2.4),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Répondre sur le site',
+                  style: AppFont.sans(
+                      size: 12.5,
+                      weight: FontWeight.w600,
+                      color: AppColors.brandStrong),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Ce sondage se répond depuis un navigateur, dans « Mes sondages ».',
+                  style: AppFont.sans(
+                      size: 12, color: AppColors.muted, height: 1.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
