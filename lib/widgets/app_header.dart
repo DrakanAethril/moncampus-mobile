@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_user.dart';
+import '../models/features.dart';
 import '../screens/profile_screen.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
@@ -56,6 +57,14 @@ class AppHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasRowsBelow = title != null || filters != null || child != null;
 
+    // The envelope follows the Courrier école feature, decided here rather than at each of the
+    // eight call sites: this widget already knows the user, and a rule spread over eight screens is
+    // a rule that will be right on seven of them (moncampus design/validated/feature-access.md
+    // §10.3).
+    final resolvedMail = (user?.has(Features.schoolMail) ?? true)
+        ? mail
+        : MailButtonState.hidden;
+
     return Container(
       width: double.infinity,
       color: AppColors.navy,
@@ -76,13 +85,13 @@ class AppHeader extends StatelessWidget {
               const SizedBox(width: 11),
               const Flexible(child: BrandWordmark.appBar()),
               const SizedBox(width: 12),
-              if (mail != MailButtonState.hidden) ...[
-                _MailButton(state: mail, onTap: onMailTap),
+              if (resolvedMail != MailButtonState.hidden) ...[
+                _MailButton(state: resolvedMail, onTap: onMailTap),
                 const SizedBox(width: 9),
               ],
               _Avatar(
                 user: user,
-                muted: mail == MailButtonState.active,
+                muted: resolvedMail == MailButtonState.active,
                 onTap: onAvatarTap ??
                     () => Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => const ProfileScreen())),

@@ -102,6 +102,8 @@ class _StudentWorkViewState extends State<StudentWorkView> {
           AppHeader(
             user: user,
             title: 'Mon travail',
+            // The envelope's own feature check lives in AppHeader, which already knows the
+            // user - here it is only ever "is there unread mail".
             mail: widget.hasUnreadMail
                 ? MailButtonState.unread
                 : MailButtonState.idle,
