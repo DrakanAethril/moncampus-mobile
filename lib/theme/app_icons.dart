@@ -19,6 +19,18 @@ class AppIcons {
   static const clipboardCheck =
       '<rect x="5" y="4.5" width="14" height="17" rx="2.5"/><path d="M9 4.5V3h6v1.5"/><path d="m9 13.5 2.2 2.2 4-4.4"/>';
 
+  /// Tab bar - « Mes cours », when the space freed by a switched-off feature promotes it from a
+  /// home-screen tile to a tab (open book).
+  static const bookOpen =
+      '<path d="M2 4.5h6a3 3 0 0 1 3 3V20a2.5 2.5 0 0 0-2.5-2.5H2Z"/>'
+      '<path d="M22 4.5h-6a3 3 0 0 0-3 3V20a2.5 2.5 0 0 1 2.5-2.5H22Z"/>';
+
+  /// Tab bar - « Quiz », promoted the same way (question mark in a circle).
+  static const questionCircle =
+      '<circle cx="12" cy="12" r="9"/>'
+      '<path d="M9.6 9.6a2.4 2.4 0 1 1 3.3 2.2c-.6.3-.9.8-.9 1.4v.3"/>'
+      '<path d="M12 17v.01"/>';
+
   /// Tab bar - Agenda (calendar with a dot).
   static const calendarDot =
       '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="12" cy="15.5" r="2" fill="currentColor" stroke="none"/>';

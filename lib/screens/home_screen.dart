@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/app_user.dart';
+import '../models/features.dart';
 import '../models/lesson_session.dart';
 import '../models/quiz_live_state.dart';
 import '../models/survey.dart';
@@ -38,12 +39,19 @@ class HomeScreen extends StatefulWidget {
     this.onViewWork,
     this.onOpenMail,
     this.hasUnreadMail = false,
+    this.showCoursesTile = true,
+    this.showQuizTile = true,
   });
 
   final VoidCallback? onViewTimetable;
   final VoidCallback? onViewWork;
   final VoidCallback? onOpenMail;
   final bool hasUnreadMail;
+
+  /// False once [MainShell] has promoted the shortcut to a tab of its own: one door per screen, or
+  /// somebody ends up on the wrong one (moncampus design/validated/feature-access.md §10.2).
+  final bool showCoursesTile;
+  final bool showQuizTile;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -81,7 +89,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final now = DateTime.now();
     final monday = now.subtract(Duration(days: now.weekday - 1));
     final sunday = monday.add(const Duration(days: 6));
-    final isStudent = auth.currentUser?.roles.contains('ROLE_STUDENT') ?? false;
+    final user = auth.currentUser;
+    final isStudent = user?.roles.contains('ROLE_STUDENT') ?? false;
+    // A switched-off feature is not asked for at all. Its endpoint would answer 404 and the
+    // catchError below would swallow it into an empty card - correct, but a round trip spent
+    // learning what the profile already said (§10.1).
+    final wantsTimetable = user?.has(Features.timetable) ?? true;
+    final wantsWork = isStudent && (user?.has(Features.studentWork) ?? true);
+    final wantsLive = isStudent && (user?.has(Features.quizLive) ?? true);
+    final wantsSurveys = user?.has(Features.surveys) ?? true;
 
     setState(() => _loading = true);
 
@@ -91,23 +107,32 @@ class _HomeScreenState extends State<HomeScreen> {
     // teacher or an admin asking for them gets a 403 the backend logs as an error, so the gate
     // is here rather than in the catchError above.
     final results = await Future.wait([
-      _timetableService
-          .fetchWeek(token, from: monday, to: sunday)
-          .catchError((_) => <LessonSession>[]),
-      if (isStudent) ...[
-        _quizLiveService.fetchActive(token).catchError((_) => null),
+      if (wantsTimetable)
+        _timetableService
+            .fetchWeek(token, from: monday, to: sunday)
+            .catchError((_) => <LessonSession>[])
+      else
+        Future<List<LessonSession>>.value(const <LessonSession>[]),
+      if (wantsLive)
+        _quizLiveService.fetchActive(token).catchError((_) => null)
+      else
+        Future<QuizLiveActiveSession?>.value(null),
+      if (wantsWork)
         _workService
             .fetchStudentBoard(token)
-            .catchError((_) => const WorkBoard(items: [], subjects: [])),
-      ],
+            .catchError((_) => const WorkBoard(items: [], subjects: []))
+      else
+        Future<WorkBoard?>.value(null),
     ]);
 
     // Asked for separately rather than in the wait above: it is the one call that is not
     // student-only, so folding it into that conditional list would tie it to a role it does not
     // have.
-    final surveys = await _surveyService
-        .fetchPending(token)
-        .catchError((_) => const <SurveySummary>[]);
+    final surveys = wantsSurveys
+        ? await _surveyService
+            .fetchPending(token)
+            .catchError((_) => const <SurveySummary>[])
+        : const <SurveySummary>[];
 
     if (!mounted) return;
 
@@ -119,8 +144,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _todaySessions = todaySessions;
-      _activeLiveSession = isStudent ? results[1] as QuizLiveActiveSession? : null;
-      _board = isStudent ? results[2] as WorkBoard : null;
+      _activeLiveSession = results[1] as QuizLiveActiveSession?;
+      _board = results[2] as WorkBoard?;
       _pendingSurveys = surveys;
       _loading = false;
     });
@@ -165,6 +190,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final work = _board?.items ?? const <WorkItem>[];
     // Both shortcuts lead to student-only areas; a teacher opening them would meet a 403.
     final isStudent = user?.roles.contains('ROLE_STUDENT') ?? false;
+    // A tile is drawn when the feature exists **and** the bar has not already promoted it to a tab
+    // (moncampus design/validated/feature-access.md §10.2).
+    final showCourses = isStudent &&
+        widget.showCoursesTile &&
+        (user?.has(Features.courseSpace) ?? true);
+    final showQuiz = isStudent &&
+        widget.showQuizTile &&
+        (user?.has(Features.quizTake) ?? true);
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -172,6 +205,8 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           AppHeader(
             user: user,
+            // The envelope's own feature check lives in AppHeader, which already knows the
+            // user - here it is only ever "is there unread mail".
             mail: widget.hasUnreadMail
                 ? MailButtonState.unread
                 : MailButtonState.idle,
@@ -186,10 +221,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _Greeting(user: user),
                   const SizedBox(height: 14),
-                  if (isStudent) ...[
+                  if (showCourses || showQuiz) ...[
                     _ShortcutRow(
-                      onCourses: _openCourses,
-                      onQuiz: _openQuiz,
+                      onCourses: showCourses ? _openCourses : null,
+                      onQuiz: showQuiz ? _openQuiz : null,
                     ),
                     const SizedBox(height: 14),
                   ],
@@ -213,7 +248,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 14),
                   ],
-                  if (_nextSession != null) ...[
+                  // Both read the timetable, which this establishment may well keep elsewhere: with
+                  // « Emploi du temps » switched off they have nothing to show, and « Emploi du
+                  // temps → » at the foot of « Ma journée » leads to a tab that no longer exists.
+                  if ((user?.has(Features.timetable) ?? true) &&
+                      _nextSession != null) ...[
                     _NextClassCard(session: _nextSession!),
                     const SizedBox(height: 14),
                   ],
@@ -221,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _workCard(work),
                     const SizedBox(height: 14),
                   ],
-                  _todayCard(),
+                  if (user?.has(Features.timetable) ?? true) _todayCard(),
                 ],
               ),
             ),
@@ -736,19 +775,30 @@ class _LiveContestBanner extends StatelessWidget {
 ///
 /// The bar stays at four tabs on purpose (design_handoff_mobile, principe 4), so these live on the
 /// home screen - which is where a student lands anyway, and where the day's own cards already sit.
+/// The two shortcut tiles of the handoff (principe 5). Either can be absent - because its feature
+/// is switched off, or because the bar has promoted it to a tab - and the row then draws the other
+/// one full width rather than leaving a gap where a tile used to be.
 class _ShortcutRow extends StatelessWidget {
-  const _ShortcutRow({required this.onCourses, required this.onQuiz});
+  const _ShortcutRow({this.onCourses, this.onQuiz});
 
-  final VoidCallback onCourses;
-  final VoidCallback onQuiz;
+  final VoidCallback? onCourses;
+  final VoidCallback? onQuiz;
 
   @override
   Widget build(BuildContext context) {
+    final tiles = <Widget>[
+      if (onCourses != null)
+        _ShortcutTile(icon: Icons.menu_book_outlined, label: 'Mes cours', onTap: onCourses!),
+      if (onQuiz != null)
+        _ShortcutTile(icon: Icons.quiz_outlined, label: 'Quiz', onTap: onQuiz!),
+    ];
+
     return Row(
       children: [
-        Expanded(child: _ShortcutTile(icon: Icons.menu_book_outlined, label: 'Mes cours', onTap: onCourses)),
-        const SizedBox(width: 10),
-        Expanded(child: _ShortcutTile(icon: Icons.quiz_outlined, label: 'Quiz', onTap: onQuiz)),
+        for (var i = 0; i < tiles.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          Expanded(child: tiles[i]),
+        ],
       ],
     );
   }
