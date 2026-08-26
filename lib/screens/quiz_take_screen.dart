@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/quiz.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
+import '../services/screen_capture_guard.dart';
 import '../theme/app_theme.dart';
 import '../widgets/quiz_matching_board.dart';
 import '../widgets/quiz_question_form.dart';
@@ -24,6 +25,8 @@ class QuizTakeScreen extends StatefulWidget {
     required this.attemptId,
     required this.quizName,
     this.startAtResult = false,
+    this.supervised = false,
+    this.sessionKey,
   });
 
   final int attemptId;
@@ -32,12 +35,21 @@ class QuizTakeScreen extends StatefulWidget {
   /// True when the student re-opens an évaluation they already handed in.
   final bool startAtResult;
 
+  /// Mode contrôle: leaving the app is journaled, screen capture is blocked, and the banner shows.
+  final bool supervised;
+
+  /// The key that owns this attempt, handed over by api_quiz_start. Presented on every call: the
+  /// last client to open the attempt owns it, and this one is told rather than left composing into
+  /// nothing when a browser takes the hand.
+  final String? sessionKey;
+
   @override
   State<QuizTakeScreen> createState() => _QuizTakeScreenState();
 }
 
-class _QuizTakeScreenState extends State<QuizTakeScreen> {
+class _QuizTakeScreenState extends State<QuizTakeScreen> with WidgetsBindingObserver {
   final _quizService = QuizService();
+  final _captureGuard = const ScreenCaptureGuard();
 
   QuizQuestionPage? _page;
   QuizResult? _result;
@@ -56,9 +68,25 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   Timer? _timer;
   int? _secondsLeft;
 
+  /// When the app stopped being frontmost, so the return can declare how long it was away.
+  ///
+  /// The declared duration is only ever *read* by the server when the departure never arrived, and
+  /// it is bounded there by the instants the application itself knows - a client that lies can only
+  /// accuse itself. The measurement proper is the difference between the two server timestamps.
+  DateTime? _leftAt;
+
+  /// The veil, iOS's stand-in for FLAG_SECURE: an opaque layer the instant the app is no longer
+  /// frontmost, so the app-switcher snapshot shows it rather than the paper. Harmless on Android,
+  /// where the system flag already blackens the thumbnail.
+  bool _veiled = false;
+
   @override
   void initState() {
     super.initState();
+    if (widget.supervised) {
+      WidgetsBinding.instance.addObserver(this);
+      _captureGuard.enable();
+    }
     if (widget.startAtResult) {
       _loadResult();
     } else {
@@ -69,7 +97,62 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    if (widget.supervised) {
+      WidgetsBinding.instance.removeObserver(this);
+      // The flag belongs to the window, not to this screen: left on, it would blacken the whole
+      // app's thumbnail long after the assessment ended.
+      _captureGuard.disable();
+    }
     super.dispose();
+  }
+
+  /// Leaving and coming back, translated into the same two facts the browser reports - the server
+  /// learns no new vocabulary from a phone.
+  ///
+  /// `inactive` fires for the notification centre and for split screen as well as for a real
+  /// departure: it is a noisy signal, and that is exactly why the rule that reads it
+  /// (App\Service\QuizSupervisionAssessor) demands a duration on top of the fact.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!widget.supervised) return;
+
+    final leaving = state == AppLifecycleState.inactive || state == AppLifecycleState.paused;
+
+    if (leaving) {
+      if (!_veiled) setState(() => _veiled = true);
+      // Only the first of inactive/paused counts: the two arrive one after the other on a single
+      // departure, and two beacons would read as two exits.
+      if (_leftAt == null) {
+        _leftAt = DateTime.now();
+        _report('page_hidden');
+      }
+
+      return;
+    }
+
+    if (state == AppLifecycleState.resumed) {
+      if (_veiled) setState(() => _veiled = false);
+      final away = _leftAt;
+      _leftAt = null;
+      _report('page_visible', durationMs: away == null ? null : DateTime.now().difference(away).inMilliseconds);
+    }
+  }
+
+  void _report(String type, {int? durationMs}) {
+    final token = context.read<AuthService>().token;
+    final key = widget.sessionKey;
+    if (token == null || key == null) return;
+
+    // Never awaited: an assessment must not wait on a beacon, and a lost one costs a duration the
+    // server reconstructs rather than an interruption for the student.
+    unawaited(_quizService.reportEvent(
+      token,
+      widget.attemptId,
+      sessionKey: key,
+      type: type,
+      position: _page?.position,
+      durationMs: durationMs,
+    ));
   }
 
   Future<void> _loadQuestion(int position) async {
@@ -82,7 +165,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
     });
 
     try {
-      final page = await _quizService.fetchQuestion(token, widget.attemptId, position);
+      final page = await _quizService.fetchQuestion(token, widget.attemptId, position, sessionKey: widget.sessionKey);
       if (!mounted) return;
 
       // The attempt ran out of time (or was already handed in) while the student was away.
@@ -110,9 +193,13 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
 
   /// Per-question countdown. Auto-submits whatever is currently answered when it runs out, matching
   /// the web's quiz_passation controller - the question closes, the attempt carries on.
+  ///
+  /// It counts down from what is LEFT of the budget, not from the whole of it: the server stamped
+  /// the question's first display and refuses a late answer against that, so a countdown starting
+  /// afresh on every reopening would only mislead the student.
   void _startTimer(QuizQuestionPage page) {
     _timer?.cancel();
-    final seconds = page.secondsForQuestion;
+    final seconds = page.secondsRemaining ?? page.secondsForQuestion;
     if (seconds == null) {
       setState(() => _secondsLeft = null);
       return;
@@ -155,6 +242,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         placements: input.placements,
         associations: input.associations,
         numeric: input.numeric,
+        sessionKey: widget.sessionKey,
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -204,7 +292,24 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.quizName)),
-      body: SafeArea(child: _buildBody()),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            _buildBody(),
+            // The veil. Opaque and total: what the app-switcher photographs is this, not the paper.
+            if (_veiled)
+              const Positioned.fill(
+                child: ColoredBox(
+                  color: AppColors.navy,
+                  child: Center(
+                    child: Text('Contrôle en cours',
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -247,6 +352,7 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              if (page.supervision?.warn ?? false) _buildSupervisionBanner(page.supervision!),
               Row(
                 children: [
                   Expanded(
@@ -281,6 +387,34 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> {
         ),
         _buildFooter(page, question),
       ],
+    );
+  }
+
+  /// The live warning, in the web's own words. It states facts - how many exits, and how long each
+  /// lasted - never an accusation: that is what makes it bearable for the student whose phone rang,
+  /// and dissuasive for the other one. It blocks nothing and does not close.
+  Widget _buildSupervisionBanner(QuizSupervisionState supervision) {
+    final durations = supervision.exitsMs.map((ms) => '${(ms / 1000).round()} s').join(', ');
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: AppColors.goldBg, borderRadius: BorderRadius.circular(9)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Vous avez quitté l’application ${supervision.exitCount} fois depuis le début du contrôle ($durations).',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.goldTx, height: 1.4),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Ces sorties sont enregistrées et transmises à votre enseignant.'
+            '${supervision.submitAt != null ? ' Au-delà de ${supervision.submitAt} sorties, votre copie sera rendue en l’état.' : ''}',
+            style: const TextStyle(fontSize: 12.5, color: AppColors.goldTx, height: 1.4),
+          ),
+        ],
+      ),
     );
   }
 

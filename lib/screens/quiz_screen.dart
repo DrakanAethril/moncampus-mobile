@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_header.dart';
+import 'quiz_contract_screen.dart';
 import 'quiz_live_join_screen.dart';
 import 'quiz_take_screen.dart';
 
@@ -61,9 +62,22 @@ class _QuizScreenState extends State<QuizScreen> {
     }
   }
 
-  Future<void> _start(int instanceId, String name) async {
+  /// Opens a quiz. [contractFor] is the supervised assessment whose entry contract has to be read
+  /// first - it is shown BEFORE the start call, because « rien n'est enregistré avant que vous
+  /// n'appuyiez sur Commencer » is only true if the attempt does not exist yet.
+  ///
+  /// Never on a resumption: the sentence would be false, and a student whose app was killed
+  /// mid-assessment has better things to read than a contract they already accepted.
+  Future<void> _start(int instanceId, String name, {QuizEvaluation? contractFor}) async {
     final token = context.read<AuthService>().token;
     if (token == null) return;
+
+    if (contractFor != null && !contractFor.done && !contractFor.inProgress) {
+      final accepted = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => QuizContractScreen(evaluation: contractFor)),
+      );
+      if (accepted != true || !mounted) return;
+    }
 
     try {
       final started = await _quizService.start(token, instanceId);
@@ -75,6 +89,8 @@ class _QuizScreenState extends State<QuizScreen> {
           quizName: name,
           // An évaluation already handed in has nothing left to answer - open its result directly.
           startAtResult: started.concluded,
+          supervised: started.supervised,
+          sessionKey: started.sessionKey,
         ),
       ));
       // Scores and "à faire / fait" statuses change while the student is inside the quiz.
@@ -227,6 +243,7 @@ class _QuizScreenState extends State<QuizScreen> {
       '${evaluation.questionCount} questions',
       if (evaluation.secondsPerQuestion != null) '${evaluation.secondsPerQuestion} s/question',
       if (evaluation.globalTimeMinutes != null) '${evaluation.globalTimeMinutes} min au total',
+      if (evaluation.supervised) 'surveillé',
     ];
 
     return _QuizCard(
@@ -242,10 +259,18 @@ class _QuizScreenState extends State<QuizScreen> {
               label: evaluation.scorePercent != null ? '${evaluation.scorePercent!.round()} %' : 'Copie remise',
               background: AppColors.greenBg,
               foreground: AppColors.greenTx)
-          : (evaluation.openNow
-              ? const _Badge(label: 'À FAIRE', background: AppColors.goldBg, foreground: AppColors.goldTx)
-              : const _Badge(label: 'FERMÉ', background: AppColors.bg, foreground: AppColors.faint)),
-      onPressed: () => _start(evaluation.instanceId, evaluation.name),
+          : (evaluation.supervised
+              // Said on the card rather than only at the door: a student who knows an assessment is
+              // supervised before opening it can choose where to sit down.
+              ? const _Badge(label: 'MODE CONTRÔLE', background: AppColors.goldBg, foreground: AppColors.goldTx)
+              : (evaluation.openNow
+                  ? const _Badge(label: 'À FAIRE', background: AppColors.goldBg, foreground: AppColors.goldTx)
+                  : const _Badge(label: 'FERMÉ', background: AppColors.bg, foreground: AppColors.faint))),
+      onPressed: () => _start(
+        evaluation.instanceId,
+        evaluation.name,
+        contractFor: evaluation.supervised ? evaluation : null,
+      ),
     );
   }
 
