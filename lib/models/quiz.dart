@@ -28,6 +28,7 @@ class QuizEvaluation {
     required this.inProgress,
     required this.done,
     required this.scorePercent,
+    required this.supervised,
   });
 
   final int instanceId;
@@ -44,6 +45,13 @@ class QuizEvaluation {
   /// score yet ("copie remise") - the UI shows "Fait" without a number in both cases.
   final double? scorePercent;
 
+  /// Mode contrôle: the passation is journaled and the student is told so at the door.
+  ///
+  /// Read here only to draw the card. The refusal of a client that cannot report is the server's
+  /// (api_quiz_start answers 409), so hiding this would change nothing - which is exactly the
+  /// difference between a padlock and a rule.
+  final bool supervised;
+
   factory QuizEvaluation.fromJson(Map<String, dynamic> json) => QuizEvaluation(
         instanceId: json['instanceId'] as int,
         name: json['name'] as String,
@@ -55,6 +63,7 @@ class QuizEvaluation {
         inProgress: json['inProgress'] as bool? ?? false,
         done: json['done'] as bool? ?? false,
         scorePercent: (json['scorePercent'] as num?)?.toDouble(),
+        supervised: json['supervised'] as bool? ?? false,
       );
 }
 
@@ -422,7 +431,9 @@ class QuizQuestionPage {
     required this.position,
     required this.total,
     required this.secondsForQuestion,
+    required this.secondsRemaining,
     required this.deadline,
+    required this.supervision,
     required this.question,
   });
 
@@ -437,9 +448,22 @@ class QuizQuestionPage {
   /// lifts the limit for itself. Null means no countdown at all.
   final int? secondsForQuestion;
 
+  /// What is LEFT of that budget, counted by the server from the question's first display.
+  ///
+  /// The one to count down from. [secondsForQuestion] is the whole budget, and starting there
+  /// again on every reopening is precisely the reload that used to hand out a fresh timer - the
+  /// server refuses the late answer either way, so a countdown that disagreed with it would only
+  /// mislead the student.
+  final int? secondsRemaining;
+
   /// Wall-clock instant the whole attempt expires (global timer or closing date, whichever comes
   /// first). Absent when the quiz has neither.
   final DateTime? deadline;
+
+  /// The banner's own numbers on a supervised passation, null on everything else. The app renders
+  /// it; the server decides it.
+  final QuizSupervisionState? supervision;
+
   final QuizQuestion? question;
 
   factory QuizQuestionPage.fromJson(Map<String, dynamic> json) => QuizQuestionPage(
@@ -456,8 +480,74 @@ class QuizQuestionPage {
         secondsForQuestion: json.containsKey('secondsForQuestion')
             ? json['secondsForQuestion'] as int?
             : json['secondsPerQuestion'] as int?,
+        // Absent on a server that predates the mode contrôle: the whole budget is then the only
+        // thing there is to count down from, exactly as before.
+        secondsRemaining: json.containsKey('secondsRemaining')
+            ? json['secondsRemaining'] as int?
+            : (json.containsKey('secondsForQuestion') ? json['secondsForQuestion'] as int? : null),
         deadline: json['deadline'] != null ? DateTime.tryParse(json['deadline'] as String) : null,
+        supervision: json['supervision'] != null
+            ? QuizSupervisionState.fromJson(json['supervision'] as Map<String, dynamic>)
+            : null,
         question: json['question'] != null ? QuizQuestion.fromJson(json['question'] as Map<String, dynamic>) : null,
+      );
+}
+
+/// What the student is told while composing a supervised assessment: how many times they have left
+/// the app, and for how long each time.
+///
+/// Facts, never an accusation - which is what makes the banner bearable for the student whose phone
+/// rang, and dissuasive for the other one. Every number here comes from the server; the app counts
+/// nothing of its own.
+class QuizSupervisionState {
+  const QuizSupervisionState({required this.exitsMs, required this.warn, required this.submitAt});
+
+  /// The length of each exit long enough to count, in milliseconds, in order.
+  final List<int> exitsMs;
+
+  /// Whether the banner should be on screen at all - « enregistrer seulement » shows nothing.
+  final bool warn;
+
+  /// After how many exits the copy is handed in, null unless the teacher asked for that.
+  final int? submitAt;
+
+  int get exitCount => exitsMs.length;
+
+  factory QuizSupervisionState.fromJson(Map<String, dynamic> json) => QuizSupervisionState(
+        exitsMs: (json['exits'] as List<dynamic>? ?? []).map((e) => (e as num).toInt()).toList(),
+        warn: json['warn'] as bool? ?? false,
+        submitAt: json['submitAt'] as int?,
+      );
+}
+
+/// What `api_quiz_start` answers.
+///
+/// [sessionKey] is what owns the attempt: the app carries it and presents it on every call, so a
+/// browser tab that opens the same attempt afterwards takes the hand and this client is told. Null
+/// on anything unsupervised, where there is no owner to be.
+class QuizStartOutcome {
+  const QuizStartOutcome({
+    required this.attemptId,
+    required this.concluded,
+    required this.supervised,
+    required this.sessionKey,
+    required this.exitSeconds,
+  });
+
+  final int attemptId;
+  final bool concluded;
+  final bool supervised;
+  final String? sessionKey;
+
+  /// How long an exit must last to count, as the teacher set it for this quiz.
+  final int? exitSeconds;
+
+  factory QuizStartOutcome.fromJson(Map<String, dynamic> json) => QuizStartOutcome(
+        attemptId: json['attemptId'] as int,
+        concluded: json['concluded'] as bool? ?? false,
+        supervised: json['supervised'] as bool? ?? false,
+        sessionKey: json['sessionKey'] as String?,
+        exitSeconds: json['supervisionExitSeconds'] as int?,
       );
 }
 
