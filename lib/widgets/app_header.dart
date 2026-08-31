@@ -7,7 +7,7 @@ import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
 import 'brand.dart';
 
-/// State of the app bar's envelope button (Courrier école) - the only entry point to the mailbox,
+/// State of the app bar's envelope button (Courrier pro) - the only entry point to the mailbox,
 /// which is never a tab (handoff, principe 5).
 enum MailButtonState {
   /// Screens that are not the mailbox, nothing unread.
@@ -19,7 +19,7 @@ enum MailButtonState {
   /// The mailbox itself (5a/5b): gold tile, and the avatar takes the translucent tile instead.
   active,
 
-  /// Roles with no Courrier école at all.
+  /// Roles with no Courrier pro at all.
   hidden,
 }
 
@@ -27,7 +27,7 @@ enum MailButtonState {
 /// rules, then the envelope and the initials avatar (handoff, "Composants récurrents" and creas
 /// 4a/4b/4d/5a/5b).
 ///
-/// [title] adds the screen-title row below it ("Mon travail", "Courrier école"), [titleTrailing]
+/// [title] adds the screen-title row below it ("Mon travail", "Courrier pro"), [titleTrailing]
 /// the light-blue text at its right (the "Toutes les matières ▾" filter), and [filters] the row
 /// of pills under that (En cours/Terminés, Reçus/Envoyés). [child] is the legacy slot still used
 /// by the screens the mobile handoff does not cover (emploi du temps' week selector).
@@ -57,7 +57,7 @@ class AppHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasRowsBelow = title != null || filters != null || child != null;
 
-    // The envelope follows the Courrier école feature, decided here rather than at each of the
+    // The envelope follows the Courrier pro feature, decided here rather than at each of the
     // eight call sites: this widget already knows the user, and a rule spread over eight screens is
     // a rule that will be right on seven of them (moncampus design/validated/feature-access.md
     // §10.3).
@@ -328,7 +328,7 @@ class AppHeaderTitleRow extends StatelessWidget {
 }
 
 /// The compact navigation bar for screens pushed two levels deep from a tab root (creas 5c
-/// "‹ Courrier école", 5d "Annuler / Nouveau mail / Envoyer") - these deliberately drop the brand
+/// "‹ Courrier pro", 5d "Annuler / Nouveau mail / Envoyer") - these deliberately drop the brand
 /// row entirely rather than stack it under yet another header.
 ///
 /// A plain widget, not a `Scaffold.appBar:` - that slot lays a `PreferredSizeWidget` out from

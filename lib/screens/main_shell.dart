@@ -21,7 +21,7 @@ import 'work_screen.dart';
 /// Travaux · Agenda - and **promotes** « Mes cours » then « Quiz » from the home screen's shortcut
 /// tiles when a place frees, to a maximum of four. Accueil is never removed.
 ///
-/// The Courrier école is still never a tab (handoff, principe 5): it is the app bar's envelope, and
+/// The Courrier pro is still never a tab (handoff, principe 5): it is the app bar's envelope, and
 /// that envelope now disappears with its feature rather than with the ROLE_STUDENT check it used to
 /// carry - which was always a rough stand-in for the same question.
 class MainShell extends StatefulWidget {

@@ -60,7 +60,7 @@ class _SchoolMailReadScreenState extends State<SchoolMailReadScreen> {
       body: Column(
         children: [
           AppNavBar(
-            title: 'Courrier école',
+            title: 'Courrier pro',
             leading: GestureDetector(
               onTap: () => Navigator.of(context).pop(),
               child: const AppIcon(AppIcons.chevronLeft,

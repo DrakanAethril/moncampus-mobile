@@ -11,7 +11,7 @@ import '../widgets/app_header.dart';
 import 'school_mail_compose_screen.dart';
 import 'school_mail_read_screen.dart';
 
-/// Courrier école (design_handoff_mobile 5a/5b), opened from the app bar's envelope and never from
+/// Courrier pro (design_handoff_mobile 5a/5b), opened from the app bar's envelope and never from
 /// the tab bar (principe 5).
 ///
 /// Locked box: a centred message and nothing else - no button, no retry, no explanation of what to
@@ -73,7 +73,7 @@ class _SchoolMailScreenState extends State<SchoolMailScreen> {
         children: [
           AppHeader(
             user: user,
-            title: 'Courrier école',
+            title: 'Courrier pro',
             mail: MailButtonState.active,
             onMailTap: () => Navigator.of(context).pop(),
             onAvatarTap: () => Navigator.of(context).pop(),

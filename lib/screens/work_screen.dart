@@ -308,7 +308,7 @@ class _TeacherWorkViewState extends State<TeacherWorkView> {
           AppHeader(
             user: user,
             title: 'Mes travaux',
-            // The Courrier école is the students' mailbox - a teacher's app bar keeps the
+            // The Courrier pro is the students' mailbox - a teacher's app bar keeps the
             // envelope's slot empty rather than opening a box they do not have.
             mail: MailButtonState.hidden,
             titleTrailing: HeaderFilterLabel(

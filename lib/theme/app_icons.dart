@@ -35,7 +35,7 @@ class AppIcons {
   static const calendarDot =
       '<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><circle cx="12" cy="15.5" r="2" fill="currentColor" stroke="none"/>';
 
-  /// App bar - Courrier école.
+  /// App bar - Courrier pro.
   static const envelope =
       '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>';
 
@@ -46,7 +46,7 @@ class AppIcons {
   static const laptop =
       '<rect x="2.5" y="4.5" width="19" height="13" rx="2"/><path d="M8 20.5h8"/>';
 
-  /// Courrier école, boîte non activée (5a).
+  /// Courrier pro, boîte non activée (5a).
   static const lock =
       '<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>';
 

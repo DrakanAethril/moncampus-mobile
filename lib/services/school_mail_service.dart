@@ -16,7 +16,7 @@ class SchoolMailException implements Exception {
   String toString() => message;
 }
 
-/// Mobile counterpart to App\Controller\Api\SchoolMailController - Courrier école (screens
+/// Mobile counterpart to App\Controller\Api\SchoolMailController - Courrier pro (screens
 /// 5a-5d). Reading, replying, forwarding and writing; no drafts and no trash, which stay on the
 /// web mailbox.
 class SchoolMailService {
