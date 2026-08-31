@@ -51,13 +51,13 @@ dependencies:
   flutter_svg: ^2.0.10
   # Magic-link deep links (campusmanager://login/<token>) - screens 6c/6d.
   app_links: ^6.1.4
-  # Courrier école attachments: they are served behind the API's Bearer auth, so they are
+  # Courrier pro attachments: they are served behind the API's Bearer auth, so they are
   # downloaded in-app to a temp file (path_provider) and handed to the OS viewer (open_filex)
   # instead of being opened in an external browser like the travaux' public links.
   path_provider: ^2.1.4
   open_filex: ^4.5.0
   # Listening travaux (design_handoff_enregistrements_audio): the file is streamed straight from its
-  # delivery URL, which needs no Bearer header - unlike the Courrier école attachments above, so
+  # delivery URL, which needs no Bearer header - unlike the Courrier pro attachments above, so
   # there is nothing to download to a temp file first. just_audio is used for its position stream,
   # which is what the listen tracking is measured from.
   just_audio: ^0.9.40
