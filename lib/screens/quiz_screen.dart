@@ -249,23 +249,31 @@ class _QuizScreenState extends State<QuizScreen> {
     return _QuizCard(
       name: evaluation.name,
       meta: meta.join(' · '),
-      // A finished évaluation still opens - on its result, not on question 1.
-      actionLabel: evaluation.done
-          ? 'Voir ma copie'
-          : (evaluation.inProgress ? 'Reprendre' : 'Commencer'),
-      enabled: evaluation.done || evaluation.openNow,
-      badge: evaluation.done
-          ? _Badge(
-              label: evaluation.scorePercent != null ? '${evaluation.scorePercent!.round()} %' : 'Copie remise',
-              background: AppColors.greenBg,
-              foreground: AppColors.greenTx)
-          : (evaluation.supervised
-              // Said on the card rather than only at the door: a student who knows an assessment is
-              // supervised before opening it can choose where to sit down.
-              ? const _Badge(label: 'MODE CONTRÔLE', background: AppColors.goldBg, foreground: AppColors.goldTx)
-              : (evaluation.openNow
-                  ? const _Badge(label: 'À FAIRE', background: AppColors.goldBg, foreground: AppColors.goldTx)
-                  : const _Badge(label: 'FERMÉ', background: AppColors.bg, foreground: AppColors.faint))),
+      // A finished évaluation still opens - on its result, not on question 1. But an attempt open
+      // right now comes first, and the order only ever matters in one case: a teacher granted a new
+      // attempt over a copy already handed in. Read the other way round, the card would say « Voir
+      // ma copie » on the very quiz the student is being asked to sit again - and the server would
+      // send them to question 1 anyway, since QuizAttemptStarter resumes the open attempt.
+      actionLabel: evaluation.inProgress
+          ? 'Reprendre'
+          : (evaluation.done ? 'Voir ma copie' : 'Commencer'),
+      // An attempt already open outlives the window on the server (api_quiz_start resumes it before
+      // asking the clock), so a new attempt granted after the closing date must not read as FERMÉ.
+      enabled: evaluation.inProgress || evaluation.done || evaluation.openNow,
+      badge: evaluation.inProgress
+          ? const _Badge(label: 'EN COURS', background: AppColors.blueBg, foreground: AppColors.blueTx)
+          : (evaluation.done
+              ? _Badge(
+                  label: evaluation.scorePercent != null ? '${evaluation.scorePercent!.round()} %' : 'Copie remise',
+                  background: AppColors.greenBg,
+                  foreground: AppColors.greenTx)
+              : (evaluation.supervised
+                  // Said on the card rather than only at the door: a student who knows an assessment
+                  // is supervised before opening it can choose where to sit down.
+                  ? const _Badge(label: 'MODE CONTRÔLE', background: AppColors.goldBg, foreground: AppColors.goldTx)
+                  : (evaluation.openNow
+                      ? const _Badge(label: 'À FAIRE', background: AppColors.goldBg, foreground: AppColors.goldTx)
+                      : const _Badge(label: 'FERMÉ', background: AppColors.bg, foreground: AppColors.faint)))),
       onPressed: () => _start(
         evaluation.instanceId,
         evaluation.name,
