@@ -30,4 +30,8 @@ abstract final class Features {
 
   /// The live-contest banner, and the only entry point the multiplayer contest has.
   static const quizLive = 'quiz_live';
+
+  /// The « Nuage de mots » banner, and the only entry point the tool has - same reason as the live
+  /// contest above: it is worth a door only while a cloud is actually open.
+  static const wordCloud = 'word_cloud';
 }
