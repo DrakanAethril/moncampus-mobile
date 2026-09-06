@@ -6,10 +6,12 @@ import '../models/app_user.dart';
 import '../models/features.dart';
 import '../models/lesson_session.dart';
 import '../models/quiz_live_state.dart';
+import '../models/word_cloud.dart';
 import '../models/survey.dart';
 import '../models/work_item.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_live_service.dart';
+import '../services/word_cloud_service.dart';
 import '../services/quiz_service.dart';
 import '../services/survey_service.dart';
 import '../services/timetable_service.dart';
@@ -21,6 +23,7 @@ import '../widgets/app_header.dart';
 import '../widgets/work_detail_sheet.dart';
 import 'course_space_screen.dart';
 import 'quiz_live_join_screen.dart';
+import 'word_cloud_screen.dart';
 import 'survey_screen.dart';
 import 'survey_take_screen.dart';
 import 'quiz_screen.dart';
@@ -60,11 +63,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _timetableService = TimetableService();
   final _quizLiveService = QuizLiveService();
+  final _wordCloudService = WordCloudService();
   final _workService = WorkService();
   final _surveyService = SurveyService();
 
   List<LessonSession>? _todaySessions;
   QuizLiveActiveSession? _activeLiveSession;
+  WordCloudBanner? _openWordCloud;
   WorkBoard? _board;
 
   /// The surveys still owed - loaded for **every** role, unlike the work board: a teacher or a
@@ -97,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final wantsTimetable = user?.has(Features.timetable) ?? true;
     final wantsWork = isStudent && (user?.has(Features.studentWork) ?? true);
     final wantsLive = isStudent && (user?.has(Features.quizLive) ?? true);
+    final wantsWordCloud = isStudent && (user?.has(Features.wordCloud) ?? true);
     final wantsSurveys = user?.has(Features.surveys) ?? true;
 
     setState(() => _loading = true);
@@ -123,6 +129,13 @@ class _HomeScreenState extends State<HomeScreen> {
             .catchError((_) => const WorkBoard(items: [], subjects: []))
       else
         Future<WorkBoard?>.value(null),
+      // Student-only like the live contest above, and gated here for the same reason: the endpoint
+      // answers a teacher with an empty body precisely so the app never has to meet a 403, but a
+      // switched-off feature is still a round trip nobody needs to spend.
+      if (wantsWordCloud)
+        _wordCloudService.fetchActive(token).catchError((_) => null)
+      else
+        Future<WordCloudBanner?>.value(null),
     ]);
 
     // Asked for separately rather than in the wait above: it is the one call that is not
@@ -146,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _todaySessions = todaySessions;
       _activeLiveSession = results[1] as QuizLiveActiveSession?;
       _board = results[2] as WorkBoard?;
+      _openWordCloud = results[3] as WordCloudBanner?;
       _pendingSurveys = surveys;
       _loading = false;
     });
@@ -245,6 +259,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     _LiveContestBanner(
                       session: _activeLiveSession!,
                       onJoin: () => _joinLiveContest(_activeLiveSession!),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  // Directly under the contest, and for the same reason it is at the top: both are
+                  // happening in the room right now, and everything below the two is due later.
+                  if (_openWordCloud != null) ...[
+                    _WordCloudBanner(
+                      cloud: _openWordCloud!,
+                      onAnswer: () => _openWordCloudScreen(_openWordCloud!),
                     ),
                     const SizedBox(height: 14),
                   ],
@@ -359,6 +382,16 @@ class _HomeScreenState extends State<HomeScreen> {
             .showSnackBar(SnackBar(content: Text(e.message)));
       }
     }
+  }
+
+  Future<void> _openWordCloudScreen(WordCloudBanner cloud) async {
+    final sent = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      builder: (_) => WordCloudScreen(cloudId: cloud.id, cloudName: cloud.name),
+    ));
+
+    // The banner stays up while the cloud is open - somebody with words left comes back to it - so
+    // the reload is about the rest of the screen, and about the cloud having closed meanwhile.
+    if (sent == true && mounted) await _loadToday();
   }
 
   void _joinLiveContest(QuizLiveActiveSession session) {
@@ -763,6 +796,71 @@ class _LiveContestBanner extends StatelessWidget {
                       size: 14,
                       weight: FontWeight.w700,
                       color: AppColors.navy)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// « Un nuage de mots est ouvert » - the tool's only door, exactly as the contest banner above is
+/// the contest's.
+///
+/// Cream and gold rather than the contest's navy, on purpose: the two can be on screen at the same
+/// time, and a student needs to tell at a glance which of the two is the one they are being asked.
+/// It is also the shade the web dashboard gives it (.cm-dash-banner).
+class _WordCloudBanner extends StatelessWidget {
+  const _WordCloudBanner({required this.cloud, required this.onAnswer});
+
+  final WordCloudBanner cloud;
+  final VoidCallback onAnswer;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onAnswer,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.goldSurface,
+          border: Border.all(color: AppColors.gold),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'UN NUAGE DE MOTS EST OUVERT',
+              style: AppFont.sans(
+                size: 11,
+                weight: FontWeight.w700,
+                color: AppColors.goldInk,
+                letterSpacing: 1.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // The question rather than the cloud's name: the name is the teacher's filing, the
+            // question is what the student is being asked.
+            Text(cloud.question,
+                style: AppFont.spectral(
+                    size: 15, weight: FontWeight.w600, color: AppColors.ink)),
+            if ((cloud.programShortName ?? '').isNotEmpty) ...[
+              const SizedBox(height: 3),
+              Text(cloud.programShortName!,
+                  style: AppFont.sans(size: 12.5, color: AppColors.muted)),
+            ],
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                  color: AppColors.brand,
+                  borderRadius: BorderRadius.circular(10)),
+              alignment: Alignment.center,
+              child: Text('Répondre',
+                  style: AppFont.sans(
+                      size: 14, weight: FontWeight.w700, color: Colors.white)),
             ),
           ],
         ),
