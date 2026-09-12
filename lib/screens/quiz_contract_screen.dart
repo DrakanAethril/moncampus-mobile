@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/quiz.dart';
 import '../theme/app_theme.dart';
+import '../utils/extra_time.dart';
 
 /// The door of a supervised assessment, in the terms of the web's own entry contract: what is
 /// recorded, who reads it, for how long, and the fact that nothing is recorded yet.
@@ -57,6 +58,17 @@ class _QuizContractScreenState extends State<QuizContractScreen> {
               ].join(' · '),
               style: const TextStyle(fontSize: 12.5, color: AppColors.faint),
             ),
+            // Said at the door, like everything else on this screen: the durations just above are
+            // the ones this student gets, aménagement included, and nothing on the other side of
+            // « Commencer » should be a surprise.
+            if (evaluation.extraTimePercent != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Vous bénéficiez de ${formatExtraTimePercent(evaluation.extraTimePercent!)} de temps supplémentaire : '
+                'les durées ci-dessus en tiennent déjà compte.',
+                style: const TextStyle(fontSize: 12.5, color: AppColors.faint),
+              ),
+            ],
             const SizedBox(height: 18),
             Container(
               padding: const EdgeInsets.all(14),

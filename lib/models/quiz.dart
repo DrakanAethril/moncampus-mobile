@@ -23,6 +23,7 @@ class QuizEvaluation {
     required this.questionCount,
     required this.secondsPerQuestion,
     required this.globalTimeMinutes,
+    required this.extraTimePercent,
     required this.closesAt,
     required this.openNow,
     required this.inProgress,
@@ -36,6 +37,13 @@ class QuizEvaluation {
   final int questionCount;
   final int? secondsPerQuestion;
   final int? globalTimeMinutes;
+
+  /// The aménagement this student holds, as a percentage - null when they hold none.
+  ///
+  /// **The durations above already include it**: the server applies it before answering, so this
+  /// is only read to tell the student why their clock differs from their neighbour's. An older
+  /// server does not send the key, which reads as null and shows nothing.
+  final double? extraTimePercent;
   final DateTime? closesAt;
   final bool openNow;
   final bool inProgress;
@@ -58,6 +66,7 @@ class QuizEvaluation {
         questionCount: json['questionCount'] as int? ?? 0,
         secondsPerQuestion: json['secondsPerQuestion'] as int?,
         globalTimeMinutes: json['globalTimeMinutes'] as int?,
+        extraTimePercent: (json['extraTimePercent'] as num?)?.toDouble(),
         closesAt: json['closesAt'] != null ? DateTime.tryParse(json['closesAt'] as String) : null,
         openNow: json['openNow'] as bool? ?? false,
         inProgress: json['inProgress'] as bool? ?? false,
@@ -74,6 +83,7 @@ class QuizPractice {
     required this.name,
     required this.questionCount,
     required this.secondsPerQuestion,
+    required this.extraTimePercent,
     required this.openNow,
     required this.inProgress,
     required this.attemptCount,
@@ -85,6 +95,9 @@ class QuizPractice {
   final String name;
   final int questionCount;
   final int? secondsPerQuestion;
+
+  /// See [QuizEvaluation.extraTimePercent] - same field, same rule.
+  final double? extraTimePercent;
   final bool openNow;
   final bool inProgress;
   final int attemptCount;
@@ -96,6 +109,7 @@ class QuizPractice {
         name: json['name'] as String,
         questionCount: json['questionCount'] as int? ?? 0,
         secondsPerQuestion: json['secondsPerQuestion'] as int?,
+        extraTimePercent: (json['extraTimePercent'] as num?)?.toDouble(),
         openNow: json['openNow'] as bool? ?? false,
         inProgress: json['inProgress'] as bool? ?? false,
         attemptCount: json['attemptCount'] as int? ?? 0,
