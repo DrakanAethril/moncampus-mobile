@@ -70,6 +70,31 @@ class WorkService {
         .toList();
   }
 
+  /// Opens one support of a travail and answers its address.
+  ///
+  /// The detour is the point: the server writes the « consigne ouverte » trace, and on a « À lire »
+  /// the completion itself - the document being that nature's proof of work, on the phone as on the
+  /// web. The route answers the address rather than redirecting to it, /api being Bearer-JWT while
+  /// the system browser carries no token.
+  Future<String?> openAttachment(
+    String token,
+    int assignmentId,
+    int attachmentId,
+  ) async {
+    final response = await _client.post(
+      Uri.parse(
+          '${ApiConfig.baseUrl}/api/student-work/$assignmentId/attachments/$attachmentId/open'),
+      headers: _headers(token),
+    );
+
+    if (response.statusCode != 200) {
+      throw WorkException("Ce document n'a pas pu être ouvert.");
+    }
+
+    return (jsonDecode(response.body) as Map<String, dynamic>)['url']
+        as String?;
+  }
+
   /// Reports what the player really heard of one file. The only write this service makes: listening
   /// is the proof of completion of a Listening travail, so a student listening on their phone has to
   /// be able to finish it there (design_handoff_enregistrements_audio, "Tracking d'écoute").

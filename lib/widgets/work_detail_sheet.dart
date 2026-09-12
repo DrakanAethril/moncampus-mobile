@@ -281,7 +281,8 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
                 label: 'Pièces jointes · ${detail.attachments.length}'),
             for (final attachment in detail.attachments) ...[
               const SizedBox(height: 8),
-              _AttachmentRow(attachment: attachment),
+              _AttachmentRow(
+                  assignmentId: item.id, attachment: attachment),
             ],
           ],
           // A survey is answered right here now that the passation exists. It stays its own screen
@@ -491,13 +492,62 @@ class _WebDepositPill extends StatelessWidget {
   }
 }
 
-class _AttachmentRow extends StatelessWidget {
-  const _AttachmentRow({required this.attachment});
+/// One support of the travail.
+///
+/// « Ouvrir » goes through the server rather than launching the address held in the row: that
+/// detour is what writes the reading - the trace on every nature, and the completion itself on a
+/// « À lire », whose document *is* the work. The address the server answers is the same one this
+/// row already carried, so nothing changes about reading the file.
+class _AttachmentRow extends StatefulWidget {
+  const _AttachmentRow({required this.assignmentId, required this.attachment});
 
+  final int assignmentId;
   final WorkAttachment attachment;
 
   @override
+  State<_AttachmentRow> createState() => _AttachmentRowState();
+}
+
+class _AttachmentRowState extends State<_AttachmentRow> {
+  bool _opening = false;
+
+  /// Falls back on the address in the row when there is nothing to call - an app talking to a
+  /// server older than the open route. The document opens, untracked, exactly as it used to.
+  Future<void> _open() async {
+    final attachment = widget.attachment;
+    final token = context.read<AuthService>().token;
+
+    if (attachment.id == null || token == null) {
+      if (attachment.url != null) {
+        await launchUrl(Uri.parse(attachment.url!),
+            mode: LaunchMode.externalApplication);
+      }
+
+      return;
+    }
+
+    setState(() => _opening = true);
+
+    try {
+      final url = await WorkService()
+          .openAttachment(token, widget.assignmentId, attachment.id!);
+
+      if (url != null) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      }
+    } on WorkException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final attachment = widget.attachment;
     final isPdf = attachment.kind.toUpperCase() == 'PDF';
 
     return Container(
@@ -534,17 +584,18 @@ class _AttachmentRow extends StatelessWidget {
                   size: 13, weight: FontWeight.w600, color: AppColors.ink),
             ),
           ),
-          if (attachment.url != null) ...[
+          if (attachment.url != null || attachment.id != null) ...[
             const SizedBox(width: 11),
             GestureDetector(
-              onTap: () => launchUrl(Uri.parse(attachment.url!),
-                  mode: LaunchMode.externalApplication),
+              onTap: _opening ? null : _open,
               child: Text(
-                'Ouvrir',
+                _opening ? 'Ouverture…' : 'Ouvrir',
                 style: AppFont.sans(
                     size: 12.5,
                     weight: FontWeight.w600,
-                    color: AppColors.brandStrong),
+                    color: _opening
+                        ? AppColors.muted
+                        : AppColors.brandStrong),
               ),
             ),
           ],
