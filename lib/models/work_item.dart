@@ -49,6 +49,7 @@ class WorkItem {
     this.questionCount,
     this.minimumScorePercent,
     this.readingUrl,
+    this.readingAttachmentId,
     this.expectationCount = 0,
   });
 
@@ -67,6 +68,7 @@ class WorkItem {
         questionCount: json['questionCount'] as int?,
         minimumScorePercent: (json['minimumScorePercent'] as num?)?.toDouble(),
         readingUrl: json['readingUrl'] as String?,
+        readingAttachmentId: json['readingAttachmentId'] as int?,
         expectationCount: json['expectationCount'] as int? ?? 0,
       );
 
@@ -89,7 +91,16 @@ class WorkItem {
   final int? surveyCampaignId;
   final int? questionCount;
   final double? minimumScorePercent;
+
+  /// Kept for nothing but the field's own history: the row now opens its document through
+  /// [readingAttachmentId], and this is the address older builds launched by themselves.
   final String? readingUrl;
+
+  /// The lone support of a reading, opened through POST
+  /// /api/student-work/{id}/attachments/{attachmentId}/open - which is what makes the reading
+  /// count, exactly as it does on the web. Null when the travail carries several supports: the
+  /// sheet then lists them, rather than the row choosing which one is read.
+  final int? readingAttachmentId;
   final int expectationCount;
 
   /// "Cybersécurité — M. Sautour · 10 questions" - the row's second line (4b). Only what the model
@@ -226,14 +237,19 @@ class WorkExpectation {
 
 /// A support the teacher attached to the travail - a file to download or a link to follow.
 class WorkAttachment {
-  const WorkAttachment({required this.label, required this.kind, this.url});
+  const WorkAttachment(
+      {required this.id, required this.label, required this.kind, this.url});
 
   factory WorkAttachment.fromJson(Map<String, dynamic> json) => WorkAttachment(
+        id: json['id'] as int?,
         label: json['label'] as String? ?? '',
         kind: json['kind'] as String? ?? 'FICHIER',
         url: json['url'] as String?,
       );
 
+  /// What the open route is called with. The row falls back on [url] without it, which is what an
+  /// app talking to a server older than the route does.
+  final int? id;
   final String label;
 
   /// Drawn in the row's 32px tile: "PDF", "PNG", "LIEN"…

@@ -201,7 +201,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthService>().currentUser;
-    final work = _board?.items ?? const <WorkItem>[];
+    // What is still owed, and only that - the web's own dashboard card reads the same way
+    // (templates/home/_student_dashboard.html.twig). A travail already settled staying here is how
+    // a « À lire » came to sit on the home screen for ever, reading exactly like an unread one; the
+    // Travaux tab is where it goes on being listed, with its « Fait » tag.
+    final work = (_board?.items ?? const <WorkItem>[])
+        .where((item) => item.state != WorkState.submitted)
+        .toList();
     // Both shortcuts lead to student-only areas; a teacher opening them would meet a 403.
     final isStudent = user?.roles.contains('ROLE_STUDENT') ?? false;
     // A tile is drawn when the feature exists **and** the bar has not already promoted it to a tab
@@ -339,10 +345,32 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// A reading whose lone support the row already names opens it here, through the server: the
+  /// click is what settles the travail, so the block it was read from stops listing it - which is
+  /// the whole point of reading from the home screen.
   Future<void> _openWork(WorkItem item) async {
-    if (item.action == WorkAction.read && item.readingUrl != null) {
-      await launchUrl(Uri.parse(item.readingUrl!),
-          mode: LaunchMode.externalApplication);
+    final attachmentId = item.readingAttachmentId;
+    final token = context.read<AuthService>().token;
+
+    if (item.action == WorkAction.read &&
+        attachmentId != null &&
+        token != null) {
+      try {
+        final url =
+            await _workService.openAttachment(token, item.id, attachmentId);
+
+        if (url != null) {
+          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        }
+      } on WorkException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(e.message)));
+        }
+      }
+
+      if (mounted) await _loadToday();
+
       return;
     }
 

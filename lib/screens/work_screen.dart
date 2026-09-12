@@ -230,16 +230,35 @@ class _StudentWorkViewState extends State<StudentWorkView> {
     }
   }
 
-  /// A reading with a link opens it; one built out of an attached file opens the sheet, where the
-  /// attachment can be opened like any other.
+  /// A reading carrying a single support opens it straight away - file or link alike, through the
+  /// server, which is what makes the reading count and takes the travail off the list. One
+  /// carrying several opens the sheet instead: choosing which of them is read is not the row's to
+  /// make.
   Future<void> _openReading(WorkItem item) async {
-    final url = item.readingUrl;
-    if (url == null) {
+    final attachmentId = item.readingAttachmentId;
+    final token = context.read<AuthService>().token;
+
+    if (attachmentId == null || token == null) {
       await _openDetail(item);
       return;
     }
 
-    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    try {
+      final url =
+          await _workService.openAttachment(token, item.id, attachmentId);
+
+      if (url != null) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      }
+    } on WorkException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+
+    // The travail is settled now, so the list it was read from has to say so.
+    if (mounted) await _load();
   }
 }
 
@@ -504,7 +523,13 @@ class _WorkRow extends StatelessWidget {
                         ),
                         if (item.state == WorkState.submitted) ...[
                           const SizedBox(width: 8),
-                          const WorkTag(label: 'Rendu'),
+                          // The web's own wording (student/_work_row.html.twig): only a deposit is
+                          // « Rendu ». A reading settled by its document, a listening, a quiz are
+                          // « Fait » - now that a reading can be finished from the phone, the tag
+                          // has to say so in the same words.
+                          WorkTag(
+                              label:
+                                  item.nature == 'to_submit' ? 'Rendu' : 'Fait'),
                         ],
                       ],
                     ),
