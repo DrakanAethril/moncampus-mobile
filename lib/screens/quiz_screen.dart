@@ -5,6 +5,7 @@ import '../models/quiz.dart';
 import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/extra_time.dart';
 import '../widgets/app_header.dart';
 import 'quiz_contract_screen.dart';
 import 'quiz_live_join_screen.dart';
@@ -243,6 +244,10 @@ class _QuizScreenState extends State<QuizScreen> {
       '${evaluation.questionCount} questions',
       if (evaluation.secondsPerQuestion != null) '${evaluation.secondsPerQuestion} s/question',
       if (evaluation.globalTimeMinutes != null) '${evaluation.globalTimeMinutes} min au total',
+      // The durations above already include the aménagement - the server sends them adjusted. This
+      // only says why they differ from the ones announced in class.
+      if (evaluation.extraTimePercent != null)
+        'aménagement +${formatExtraTimePercent(evaluation.extraTimePercent!)}',
       if (evaluation.supervised) 'surveillé',
     ];
 
@@ -288,6 +293,8 @@ class _QuizScreenState extends State<QuizScreen> {
       practice.attemptCount == 0
           ? 'Jamais tenté'
           : '${practice.attemptCount} tentative${practice.attemptCount > 1 ? 's' : ''}',
+      if (practice.extraTimePercent != null)
+        'aménagement +${formatExtraTimePercent(practice.extraTimePercent!)}',
     ];
 
     return _QuizCard(
