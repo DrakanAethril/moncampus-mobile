@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../models/video_watch_tracking.dart';
 import '../models/work_item.dart';
 import 'api_config.dart';
 
@@ -127,18 +128,19 @@ class WorkService {
   ///
   /// Same ratchet on the server (App\Service\VideoWatchTracker): only the maximum is kept, so a
   /// report that went missing costs nothing but the credit of that moment, which the next one
-  /// makes up.
+  /// makes up. The detail - playing time, skips, losses of focus - is lost with it; it only ever
+  /// informs the teacher, never the completion.
   Future<int> reportWatchProgress(
     String token,
     int assignmentId,
     int fileId,
-    int percent,
+    VideoWatchReport report,
   ) async {
     final response = await _client.post(
       Uri.parse(
           '${ApiConfig.baseUrl}/api/student-work/$assignmentId/video/$fileId/watch-progress'),
       headers: {..._headers(token), 'Content-Type': 'application/json'},
-      body: jsonEncode({'percent': percent}),
+      body: jsonEncode(report.toJson()),
     );
 
     if (response.statusCode != 200) {
@@ -147,7 +149,7 @@ class WorkService {
 
     return (jsonDecode(response.body) as Map<String, dynamic>)['percent']
             as int? ??
-        percent;
+        report.percent;
   }
 
   Map<String, String> _headers(String token) => {

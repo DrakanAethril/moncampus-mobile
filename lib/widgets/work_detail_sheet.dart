@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/video_watch_tracking.dart';
 import '../models/work_item.dart';
 import '../screens/survey_take_screen.dart';
 import '../screens/work_screen.dart' show WorkTag;
@@ -107,13 +108,13 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
     }
   }
 
-  Future<void> _reportWatching(int fileId, int percent) async {
+  Future<void> _reportWatching(int fileId, VideoWatchReport report) async {
     final token = context.read<AuthService>().token;
     if (token == null) return;
 
     try {
       await _workService.reportWatchProgress(
-          token, widget.item.id, fileId, percent);
+          token, widget.item.id, fileId, report);
     } catch (_) {
       // Deliberately ignored - see above.
     }
@@ -257,7 +258,7 @@ class _WorkDetailSheetState extends State<WorkDetailSheet> {
                 file: file,
                 assignmentId: widget.item.id,
                 cues: _cues,
-                onProgress: (percent) => _reportWatching(file.id, percent),
+                onProgress: (report) => _reportWatching(file.id, report),
                 // An answered marker must not be asked again on a second viewing.
                 onCueAnswered: (_) => _loadCues(),
               ),
