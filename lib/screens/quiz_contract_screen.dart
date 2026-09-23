@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/quiz.dart';
 import '../theme/app_theme.dart';
 import '../utils/extra_time.dart';
+import '../widgets/quiz_penalty_notice.dart';
 
 /// The door of a supervised assessment, in the terms of the web's own entry contract: what is
 /// recorded, who reads it, for how long, and the fact that nothing is recorded yet.
@@ -70,6 +71,10 @@ class _QuizContractScreenState extends State<QuizContractScreen> {
               ),
             ],
             const SizedBox(height: 18),
+            // Above the surveillance block rather than inside it: what a wrong answer costs is not
+            // part of the contrôle, it is part of the marking, and a student would read it as one
+            // more thing being recorded.
+            QuizPenaltyNotice(penalty: evaluation.negativeMarking, margin: const EdgeInsets.only(bottom: 18)),
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(

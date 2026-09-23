@@ -5,6 +5,8 @@
 /// server-driven state machine, whereas everything here is paced by the student.
 library;
 
+import '../utils/penalty.dart';
+
 class QuizProgram {
   const QuizProgram({required this.id, required this.name});
 
@@ -13,6 +15,62 @@ class QuizProgram {
 
   factory QuizProgram.fromJson(Map<String, dynamic> json) =>
       QuizProgram(id: json['id'] as int, name: json['name'] as String);
+}
+
+/// « Note négative sur erreurs » as the quiz was launched with it - null on every quiz that carries
+/// no penalty, which is every quiz until a teacher ticks the box.
+///
+/// The server sends the rule, not a sentence: the app words it, exactly as it words the supervision
+/// banner from [QuizSupervisionState]. What it must never do is *compute* with it - the marks are
+/// decided server-side and frozen into each answer as it is given, so anything worked out here
+/// could only ever disagree with the copy.
+///
+/// The wording lives in one place ([QuizPenaltyNotice] and [shortLabel] below) so the hub card, the
+/// door and the passation cannot end up announcing three different arithmetics.
+class QuizNegativeMarking {
+  const QuizNegativeMarking({
+    required this.mode,
+    required this.points,
+    required this.percent,
+    required this.floorAtZero,
+  });
+
+  /// 'fixed' - a flat number of points - or 'scale', a share of what the question is worth.
+  final String mode;
+
+  /// Points removed per wrong answer under 'fixed'.
+  final double points;
+
+  /// Share of the question's own weight removed per wrong answer under 'scale'.
+  final int percent;
+
+  /// Whether the copy stops at 0 rather than going below it.
+  final bool floorAtZero;
+
+  bool get isScale => mode == 'scale';
+
+  /// The cost in one breath, for a card's meta line: « −0,5 pt par erreur ».
+  String get shortLabel =>
+      isScale ? '−$percent % du barème par erreur' : '−${formatPenaltyPoints(points)} pt par erreur';
+
+  /// The same thing as a sentence, for the door and the passation.
+  String get costSentence => isScale
+      ? 'Chaque réponse fausse retire $percent % du barème de la question.'
+      : 'Chaque réponse fausse retire ${formatPenaltyPoints(points)} point.';
+
+  String get floorSentence =>
+      floorAtZero ? 'La note ne peut pas descendre en dessous de 0.' : 'La note peut descendre en dessous de 0.';
+
+  /// Null-safe by design: every caller reads a key that an older server simply does not send, and
+  /// a quiz without the penalty sends null on purpose. Both mean « no penalty » and show nothing.
+  static QuizNegativeMarking? fromJson(Object? json) => json is Map<String, dynamic>
+      ? QuizNegativeMarking(
+          mode: json['mode'] as String? ?? 'fixed',
+          points: (json['points'] as num?)?.toDouble() ?? 0,
+          percent: (json['percent'] as num?)?.toInt() ?? 0,
+          floorAtZero: json['floorAtZero'] as bool? ?? true,
+        )
+      : null;
 }
 
 /// One "Évaluations" row - a graded quiz with a single attempt.
@@ -30,6 +88,7 @@ class QuizEvaluation {
     required this.done,
     required this.scorePercent,
     required this.supervised,
+    required this.negativeMarking,
   });
 
   final int instanceId;
@@ -60,6 +119,10 @@ class QuizEvaluation {
   /// difference between a padlock and a rule.
   final bool supervised;
 
+  /// What a wrong answer costs on this quiz, null when it costs nothing - see
+  /// [QuizNegativeMarking]. Said on the card so the student knows before opening it.
+  final QuizNegativeMarking? negativeMarking;
+
   factory QuizEvaluation.fromJson(Map<String, dynamic> json) => QuizEvaluation(
         instanceId: json['instanceId'] as int,
         name: json['name'] as String,
@@ -73,6 +136,7 @@ class QuizEvaluation {
         done: json['done'] as bool? ?? false,
         scorePercent: (json['scorePercent'] as num?)?.toDouble(),
         supervised: json['supervised'] as bool? ?? false,
+        negativeMarking: QuizNegativeMarking.fromJson(json['negativeMarking']),
       );
 }
 
@@ -89,6 +153,7 @@ class QuizPractice {
     required this.attemptCount,
     required this.bestScorePercent,
     required this.lastScorePercent,
+    required this.negativeMarking,
   });
 
   final int instanceId;
@@ -104,6 +169,9 @@ class QuizPractice {
   final double? bestScorePercent;
   final double? lastScorePercent;
 
+  /// See [QuizEvaluation.negativeMarking] - same field, same rule.
+  final QuizNegativeMarking? negativeMarking;
+
   factory QuizPractice.fromJson(Map<String, dynamic> json) => QuizPractice(
         instanceId: json['instanceId'] as int,
         name: json['name'] as String,
@@ -115,6 +183,7 @@ class QuizPractice {
         attemptCount: json['attemptCount'] as int? ?? 0,
         bestScorePercent: (json['bestScorePercent'] as num?)?.toDouble(),
         lastScorePercent: (json['lastScorePercent'] as num?)?.toDouble(),
+        negativeMarking: QuizNegativeMarking.fromJson(json['negativeMarking']),
       );
 }
 
@@ -448,6 +517,7 @@ class QuizQuestionPage {
     required this.secondsRemaining,
     required this.deadline,
     required this.supervision,
+    required this.negativeMarking,
     required this.question,
   });
 
@@ -478,6 +548,10 @@ class QuizQuestionPage {
   /// it; the server decides it.
   final QuizSupervisionState? supervision;
 
+  /// What a wrong answer costs, said while composing rather than only at the door - an
+  /// entraînement has no door at all. Null on a quiz carrying no penalty, and on an older server.
+  final QuizNegativeMarking? negativeMarking;
+
   final QuizQuestion? question;
 
   factory QuizQuestionPage.fromJson(Map<String, dynamic> json) => QuizQuestionPage(
@@ -503,6 +577,7 @@ class QuizQuestionPage {
         supervision: json['supervision'] != null
             ? QuizSupervisionState.fromJson(json['supervision'] as Map<String, dynamic>)
             : null,
+        negativeMarking: QuizNegativeMarking.fromJson(json['negativeMarking']),
         question: json['question'] != null ? QuizQuestion.fromJson(json['question'] as Map<String, dynamic>) : null,
       );
 }
@@ -584,6 +659,7 @@ class QuizCorrectionEntry {
     required this.label,
     required this.type,
     required this.isCorrect,
+    required this.score,
     required this.explanation,
     required this.answers,
     required this.blankResponses,
@@ -617,6 +693,10 @@ class QuizCorrectionEntry {
   final String label;
   final String type;
   final bool isCorrect;
+
+  /// What this line was worth, penalty included - negative on a question the quiz charged for.
+  /// Null on a server that predates the key, where the correction simply shows no figure.
+  final double? score;
   final String? explanation;
   final List<QuizCorrectionAnswer> answers;
   final List<String> blankResponses;
@@ -695,6 +775,7 @@ class QuizCorrectionEntry {
       label: json['label'] as String? ?? '',
       type: json['type'] as String? ?? '',
       isCorrect: json['isCorrect'] as bool? ?? false,
+      score: (json['score'] as num?)?.toDouble(),
       explanation: json['explanation'] as String?,
       answers: (json['answers'] as List<dynamic>? ?? [])
           .map((e) => QuizCorrectionAnswer.fromJson(e as Map<String, dynamic>))
@@ -750,6 +831,7 @@ class QuizResult {
     required this.questionTotal,
     required this.scorePercent,
     required this.scoreOn20,
+    required this.negativeMarking,
     required this.correction,
   });
 
@@ -764,6 +846,10 @@ class QuizResult {
   final double? scorePercent;
   final double? scoreOn20;
 
+  /// Read on the result to explain a mark lower than the right answers alone would have paid -
+  /// and, when the floor bit, why it stopped at 0.
+  final QuizNegativeMarking? negativeMarking;
+
   /// Only ever filled in entraînement - the correction is that mode's whole point.
   final List<QuizCorrectionEntry> correction;
 
@@ -777,6 +863,7 @@ class QuizResult {
         questionTotal: json['questionTotal'] as int?,
         scorePercent: (json['scorePercent'] as num?)?.toDouble(),
         scoreOn20: (json['scoreOn20'] as num?)?.toDouble(),
+        negativeMarking: QuizNegativeMarking.fromJson(json['negativeMarking']),
         correction: (json['correction'] as List<dynamic>? ?? [])
             .map((e) => QuizCorrectionEntry.fromJson(e as Map<String, dynamic>))
             .toList(),

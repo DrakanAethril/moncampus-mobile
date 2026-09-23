@@ -8,7 +8,9 @@ import '../services/auth_service.dart';
 import '../services/quiz_service.dart';
 import '../services/screen_capture_guard.dart';
 import '../theme/app_theme.dart';
+import '../utils/penalty.dart';
 import '../widgets/quiz_matching_board.dart';
+import '../widgets/quiz_penalty_notice.dart';
 import '../widgets/quiz_question_form.dart';
 import '../widgets/quiz_zone_support.dart';
 
@@ -353,6 +355,9 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> with WidgetsBindingObse
             padding: const EdgeInsets.all(16),
             children: [
               if (page.supervision?.warn ?? false) _buildSupervisionBanner(page.supervision!),
+              // On every question rather than at the door only: an entraînement has no door, and
+              // this is the one screen every student passing this quiz will see.
+              QuizPenaltyNotice(penalty: page.negativeMarking),
               Row(
                 children: [
                   Expanded(
@@ -621,8 +626,25 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> with WidgetsBindingObse
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: AppColors.muted)),
               if (result.scoreVisible && result.questionTotal != null) ...[
                 const SizedBox(height: 6),
-                Text('${result.score} / ${result.questionTotal} bonnes réponses',
-                    style: const TextStyle(fontSize: 13, color: AppColors.faint)),
+                // « bonnes réponses » stops being true the moment a wrong one costs points: the
+                // figure is then a points total, and can even be negative. Counting them would be
+                // the same sentence saying two different things.
+                Text(
+                  result.negativeMarking != null
+                      ? '${result.score} / ${result.questionTotal} points'
+                      : '${result.score} / ${result.questionTotal} bonnes réponses',
+                  style: const TextStyle(fontSize: 13, color: AppColors.faint),
+                ),
+              ],
+              // Why a mark can be lower than the right answers alone would have paid - and, when
+              // the floor bit, why it stopped at 0.
+              if (result.scoreVisible && result.negativeMarking != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '${result.negativeMarking!.costSentence} ${result.negativeMarking!.floorSentence}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12.5, color: AppColors.faint, height: 1.4),
+                ),
               ],
               if (!result.scoreVisible) ...[
                 const SizedBox(height: 6),
@@ -667,6 +689,18 @@ class _QuizTakeScreenState extends State<QuizTakeScreen> with WidgetsBindingObse
               Expanded(
                 child: Text(entry.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.ink)),
               ),
+              // Only where it says something the ✓/✕ does not: a line that COST points. Printing
+              // « +1 » beside every right answer would just repeat the tick, and a plain 0 beside
+              // a wrong one says nothing either.
+              if ((entry.score ?? 0) < 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(color: AppColors.redBg, borderRadius: BorderRadius.circular(6)),
+                  child: Text(formatPenaltyScore(entry.score!),
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.redTx)),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 10),

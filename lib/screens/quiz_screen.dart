@@ -249,6 +249,9 @@ class _QuizScreenState extends State<QuizScreen> {
       if (evaluation.extraTimePercent != null)
         'aménagement +${formatExtraTimePercent(evaluation.extraTimePercent!)}',
       if (evaluation.supervised) 'surveillé',
+      // Said on the card, like « surveillé » just above and for the same reason: what a wrong
+      // answer will cost is part of choosing when to sit down, not a surprise for question 1.
+      if (evaluation.negativeMarking != null) evaluation.negativeMarking!.shortLabel,
     ];
 
     return _QuizCard(
@@ -295,6 +298,7 @@ class _QuizScreenState extends State<QuizScreen> {
           : '${practice.attemptCount} tentative${practice.attemptCount > 1 ? 's' : ''}',
       if (practice.extraTimePercent != null)
         'aménagement +${formatExtraTimePercent(practice.extraTimePercent!)}',
+      if (practice.negativeMarking != null) practice.negativeMarking!.shortLabel,
     ];
 
     return _QuizCard(
