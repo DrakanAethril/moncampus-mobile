@@ -34,4 +34,9 @@ abstract final class Features {
   /// The « Nuage de mots » banner, and the only entry point the tool has - same reason as the live
   /// contest above: it is worth a door only while a cloud is actually open.
   static const wordCloud = 'word_cloud';
+
+  /// The « Matériel » tile - Gestion > Matériel, for the four roles that keep the inventory. Read
+  /// with [AppUser.hasStrictly]: an older backend that does not know the key must not draw a tile
+  /// whose screen would answer 404.
+  static const equipment = 'equipment';
 }
