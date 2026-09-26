@@ -52,6 +52,13 @@ class AppUser {
   /// Whether [key] is switched on for this account. Unknown keys read as `true` - see [features].
   bool has(String key) => features[key] ?? true;
 
+  /// Whether [key] is switched on **and known** to the backend. For a door added after the app's
+  /// oldest supported backend: there, a missing key means the screen behind it does not exist yet.
+  bool hasStrictly(String key) => features[key] ?? false;
+
+  /// The four roles that keep Gestion > Matériel - the backend's own lock on /api/equipment.
+  bool get keepsEquipment => roles.any(const {'ROLE_ADMIN', 'ROLE_STAFF', 'ROLE_STAFF-LEAD', 'ROLE_SUPPORT-TECH'}.contains);
+
   /// Local-only address (App\Entity\User::$contactEmail on the backend) - distinct from [email],
   /// the LDAP-synced directory address. Drives the 3-state machine on ProfileScreen: null =
   /// missing, set+!verified = pending, set+verified = verified.

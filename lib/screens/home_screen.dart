@@ -22,6 +22,7 @@ import '../utils/french_date.dart';
 import '../widgets/app_header.dart';
 import '../widgets/work_detail_sheet.dart';
 import 'course_space_screen.dart';
+import 'equipment_screen.dart';
 import 'quiz_live_join_screen.dart';
 import 'word_cloud_screen.dart';
 import 'survey_screen.dart';
@@ -218,6 +219,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final showQuiz = isStudent &&
         widget.showQuizTile &&
         (user?.has(Features.quizTake) ?? true);
+    // Gestion > Matériel is for the people who hand the spares out, never for a class.
+    final showEquipment = (user?.keepsEquipment ?? false) && (user?.hasStrictly(Features.equipment) ?? false);
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -241,10 +244,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _Greeting(user: user),
                   const SizedBox(height: 14),
-                  if (showCourses || showQuiz) ...[
+                  if (showCourses || showQuiz || showEquipment) ...[
                     _ShortcutRow(
                       onCourses: showCourses ? _openCourses : null,
                       onQuiz: showQuiz ? _openQuiz : null,
+                      onEquipment: showEquipment ? _openEquipment : null,
                     ),
                     const SizedBox(height: 14),
                   ],
@@ -386,6 +390,11 @@ class _HomeScreenState extends State<HomeScreen> {
   /// list as the travaux. Its screen shipped with the quiz feature and nothing ever pushed it.
   void _openQuiz() {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => const QuizScreen()));
+  }
+
+  /// « Matériel » - an inventory movement recorded with the piece in hand.
+  void _openEquipment() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EquipmentScreen()));
   }
 
   Future<void> _launchQuiz(WorkItem item) async {
@@ -905,10 +914,14 @@ class _WordCloudBanner extends StatelessWidget {
 /// is switched off, or because the bar has promoted it to a tab - and the row then draws the other
 /// one full width rather than leaving a gap where a tile used to be.
 class _ShortcutRow extends StatelessWidget {
-  const _ShortcutRow({this.onCourses, this.onQuiz});
+  const _ShortcutRow({this.onCourses, this.onQuiz, this.onEquipment});
 
   final VoidCallback? onCourses;
   final VoidCallback? onQuiz;
+
+  /// « Matériel », for the keepers of the inventory - who are not students, so in practice it is
+  /// drawn alone, full width.
+  final VoidCallback? onEquipment;
 
   @override
   Widget build(BuildContext context) {
@@ -917,6 +930,8 @@ class _ShortcutRow extends StatelessWidget {
         _ShortcutTile(icon: Icons.menu_book_outlined, label: 'Mes cours', onTap: onCourses!),
       if (onQuiz != null)
         _ShortcutTile(icon: Icons.quiz_outlined, label: 'Quiz', onTap: onQuiz!),
+      if (onEquipment != null)
+        _ShortcutTile(icon: Icons.inventory_2_outlined, label: 'Matériel', onTap: onEquipment!),
     ];
 
     return Row(
