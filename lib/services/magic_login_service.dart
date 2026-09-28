@@ -43,11 +43,11 @@ class MagicLoginService {
   }
 
   /// Trades the token carried by the deep link for a JWT (6c).
-  Future<({String token, String? firstname})> consume(String token) async {
+  Future<({String token, String? refreshToken, String? firstname})> consume(String token) async {
     final response = await _client.post(
       Uri.parse('${ApiConfig.baseUrl}/api/magic-login/consume'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'token': token}),
+      body: jsonEncode({'token': token, 'client': 'moncampus'}),
     );
 
     if (response.statusCode == 410) {
@@ -61,6 +61,7 @@ class MagicLoginService {
 
     return (
       token: body['token'] as String,
+      refreshToken: body['refreshToken'] as String?,
       firstname: body['firstname'] as String?,
     );
   }

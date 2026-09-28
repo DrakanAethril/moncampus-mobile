@@ -40,7 +40,7 @@ class _MagicLinkLandingScreenState extends State<MagicLinkLandingScreen> {
 
     try {
       final result = await _service.consume(widget.token);
-      await auth.adoptToken(result.token);
+      await auth.adoptToken(result.token, refreshToken: result.refreshToken);
       if (!mounted) return;
 
       final canUseBiometrics = await auth.canUseBiometrics;
