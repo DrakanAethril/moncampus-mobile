@@ -61,6 +61,9 @@ class MonCampusApp extends StatelessWidget {
 /// 6) pushes the landing screen, which trades the token for a session. Listening here rather than
 /// in main() means the navigator already exists when a link arrives, including the one that cold
 /// started the app.
+///
+/// And the one that notices the app coming back to the foreground: AuthService's renewal timer
+/// does not run while the phone sleeps, so a JWT that ran out meanwhile is renewed here.
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
@@ -68,20 +71,29 @@ class AuthGate extends StatefulWidget {
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
+class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   final _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _linkSubscription = _appLinks.uriLinkStream.listen(_handleLink);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _linkSubscription?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      context.read<AuthService>().refreshIfExpiring();
+    }
   }
 
   void _handleLink(Uri uri) {
