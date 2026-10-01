@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/app_user.dart';
 import '../models/features.dart';
 import '../models/lesson_session.dart';
 import '../models/quiz_live_state.dart';
-import '../models/word_cloud.dart';
 import '../models/survey.dart';
+import '../models/word_cloud.dart';
 import '../models/work_item.dart';
 import '../services/auth_service.dart';
+import '../services/platform_bridge.dart';
 import '../services/quiz_live_service.dart';
-import '../services/word_cloud_service.dart';
 import '../services/quiz_service.dart';
 import '../services/survey_service.dart';
 import '../services/timetable_service.dart';
+import '../services/word_cloud_service.dart';
 import '../services/work_service.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
@@ -360,12 +360,8 @@ class _HomeScreenState extends State<HomeScreen> {
         attachmentId != null &&
         token != null) {
       try {
-        final url =
-            await _workService.openAttachment(token, item.id, attachmentId);
-
-        if (url != null) {
-          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-        }
+        await openResolvedUrl(
+            () => _workService.openAttachment(token, item.id, attachmentId));
       } on WorkException catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context)

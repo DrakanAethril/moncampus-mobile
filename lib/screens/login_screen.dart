@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -108,7 +109,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       body: BrandHero(
-        footer: const _BiometricMention(),
+        // The PWA has no biometric unlock (AuthService.canUseBiometrics): nothing to mention.
+        footer: kIsWeb ? null : const _BiometricMention(),
         child: Column(
           children: [
             if (auth.hasPendingBiometricUnlock)

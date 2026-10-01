@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 
 import '../models/school_mail.dart';
 import 'api_config.dart';
@@ -67,7 +67,8 @@ class SchoolMailService {
         jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  /// Sending (5d). Multipart, since attachments are files picked on the phone; [application] is
+  /// Sending (5d). Multipart, since attachments are files picked on the phone - read from their
+  /// path there, from the bytes the picker hands back in the PWA, which has none; [application] is
   /// the démarche the mail belongs to and [replyToId] threads it onto the mail being answered.
   Future<void> send(
     String token, {
@@ -76,7 +77,7 @@ class SchoolMailService {
     required String body,
     required String application,
     int? replyToId,
-    List<File> attachments = const [],
+    List<PlatformFile> attachments = const [],
   }) async {
     final request = http.MultipartRequest(
       'POST',
@@ -93,8 +94,10 @@ class SchoolMailService {
     }
 
     for (final file in attachments) {
-      request.files
-          .add(await http.MultipartFile.fromPath('attachments[]', file.path));
+      final bytes = file.bytes;
+      request.files.add(bytes != null
+          ? http.MultipartFile.fromBytes('attachments[]', bytes, filename: file.name)
+          : await http.MultipartFile.fromPath('attachments[]', file.path!));
     }
 
     final response = await request.send();
@@ -108,9 +111,9 @@ class SchoolMailService {
   }
 
   /// Attachments are stored in the mail bucket and served behind the API's Bearer auth, which an
-  /// external browser could not present - so the file is downloaded here and handed to the OS as
-  /// a local file.
-  Future<File> downloadAttachment(
+  /// external browser could not present - so the file is downloaded here, and handed over by
+  /// platform_bridge's openDownloadedFile().
+  Future<({Uint8List bytes, String? mimeType})> downloadAttachment(
       String token, MailAttachment attachment) async {
     final response = await _client.get(
       Uri.parse(
@@ -122,11 +125,7 @@ class SchoolMailService {
       throw SchoolMailException("Pièce jointe indisponible.");
     }
 
-    final directory = await getTemporaryDirectory();
-    final file = File('${directory.path}/${attachment.filename}');
-    await file.writeAsBytes(response.bodyBytes);
-
-    return file;
+    return (bytes: response.bodyBytes, mimeType: response.headers['content-type']);
   }
 
   Map<String, String> _headers(String token) => {

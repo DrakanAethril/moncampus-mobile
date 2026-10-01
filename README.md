@@ -19,6 +19,22 @@ A real Android phone only reaches a LAN address over plain HTTP in a **debug** b
 `android/app/src/debug/res/xml/network_security_config.xml` allows it there, and release builds keep
 the strict policy. Dev accounts: `admin` / `password` (fictitious LDAP seed).
 
+## The PWA (web version)
+
+The same app, compiled for the browser and served by moncampus at **`/campus-app/`** - for the
+iPhones no IPA reaches. `tool/build_pwa.sh` builds it (release, CanvasKit served locally) and
+publishes it into the moncampus repo's `public/campus-app/`; the `release-mobile-apps` skill runs
+it alongside the APK. A release web build calls the origin it was loaded from, so it is never given
+`API_BASE_URL`.
+
+What differs from the phone lives in one place, `lib/services/platform_bridge.dart` (the io half
+and the web half, the latter backed by `web/campus_web.js`): the live quiz's Mercure stream read
+through `fetch`, Courrier pro attachments handed over as downloads, documents opened in a tab
+created during the tap (Safari refuses one opened after the API's answer), and the magic link
+read from `?login=`. No biometric unlock and no capture blocking on the web. The service worker
+is `web/campus_sw.js` - Flutter 3.22's caches nothing under a sub-path. See
+`public/campus-app/README.md` in the moncampus repo.
+
 ## License
 
 Copyright (c) 2026 Sébastien Tharaud. Released under the **MIT License** — see [LICENSE](LICENSE).

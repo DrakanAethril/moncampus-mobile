@@ -1,6 +1,5 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -48,7 +47,7 @@ class _SchoolMailComposeScreenState extends State<SchoolMailComposeScreen> {
 
   ComposeMeta? _meta;
   String? _application;
-  final List<File> _attachments = [];
+  final List<PlatformFile> _attachments = [];
   bool _sending = false;
   String? _error;
 
@@ -85,11 +84,14 @@ class _SchoolMailComposeScreenState extends State<SchoolMailComposeScreen> {
   }
 
   Future<void> _pickAttachments() async {
-    final result = await FilePicker.platform.pickFiles(allowMultiple: true);
+    // A browser gives no path to a picked file, only its bytes; the phone keeps reading from the
+    // path, so a large attachment is not held in memory until the send.
+    final result = await FilePicker.platform
+        .pickFiles(allowMultiple: true, withData: kIsWeb);
     if (result == null) return;
 
-    setState(() => _attachments.addAll(
-        result.paths.whereType<String>().map(File.new)));
+    setState(() => _attachments.addAll(result.files
+        .where((file) => file.bytes != null || file.path != null)));
   }
 
   Future<void> _pickApplication() async {
@@ -347,7 +349,7 @@ class _SchoolMailComposeScreenState extends State<SchoolMailComposeScreen> {
                   const AppIcon(AppIcons.paperclip,
                       size: 12, color: AppColors.text),
                   const SizedBox(width: 7),
-                  Text(file.path.split('/').last,
+                  Text(file.name,
                       style:
                           AppFont.sans(size: 12, color: AppColors.text)),
                   const SizedBox(width: 7),
