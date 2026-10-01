@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:provider/provider.dart';
 
 import '../models/school_mail.dart';
 import '../services/auth_service.dart';
+import '../services/platform_bridge.dart';
 import '../services/school_mail_service.dart';
 import '../theme/app_icons.dart';
 import '../theme/app_theme.dart';
@@ -252,7 +252,8 @@ class _AttachmentCardState extends State<_AttachmentCard> {
     try {
       final file =
           await SchoolMailService().downloadAttachment(token, widget.attachment);
-      await OpenFilex.open(file.path);
+      await openDownloadedFile(widget.attachment.filename, file.bytes,
+          mimeType: file.mimeType);
     } on SchoolMailException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/course_space.dart';
 import '../services/auth_service.dart';
 import '../services/course_space_service.dart';
+import '../services/platform_bridge.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_header.dart';
 
@@ -79,10 +79,9 @@ class _CourseSequenceScreenState extends State<CourseSequenceScreen> {
     setState(() => _opening = resource.id);
 
     try {
-      final url = await _service.openResource(token, resource.id);
+      await openResolvedUrl(() => _service.openResource(token, resource.id));
       if (!mounted) return;
 
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       // The row's "déjà ouverte" mark is now stale - the server has just recorded the opening.
       if (mounted) await _load();
     } on CourseSpaceException catch (error) {

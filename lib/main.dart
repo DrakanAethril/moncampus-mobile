@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -9,6 +10,7 @@ import 'screens/login_screen.dart';
 import 'screens/magic_link_landing_screen.dart';
 import 'screens/main_shell.dart';
 import 'services/auth_service.dart';
+import 'services/platform_bridge.dart';
 import 'theme/app_theme.dart';
 import 'widgets/brand.dart';
 
@@ -60,7 +62,8 @@ class MonCampusApp extends StatelessWidget {
 /// Also the app's deep-link listener: `campusmanager://login/<token>` (design_handoff_mobile, tour
 /// 6) pushes the landing screen, which trades the token for a session. Listening here rather than
 /// in main() means the navigator already exists when a link arrives, including the one that cold
-/// started the app.
+/// started the app. The PWA has no scheme of its own: its link is its own address with the token
+/// in `?login=` (platform_bridge), read once at start.
 ///
 /// And the one that notices the app coming back to the foreground: AuthService's renewal timer
 /// does not run while the phone sleeps, so a JWT that ran out meanwhile is renewed here.
@@ -72,14 +75,20 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
-  final _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _linkSubscription = _appLinks.uriLinkStream.listen(_handleLink);
+    if (kIsWeb) {
+      final token = takeLoginTokenFromAddress();
+      if (token != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _openLanding(token));
+      }
+    } else {
+      _linkSubscription = AppLinks().uriLinkStream.listen(_handleLink);
+    }
   }
 
   @override
@@ -102,6 +111,10 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     final token = uri.pathSegments.isEmpty ? '' : uri.pathSegments.last;
     if (token.isEmpty) return;
 
+    _openLanding(token);
+  }
+
+  void _openLanding(String token) {
     // Back to the root first: a second link (a resend, a link opened twice) must replace the
     // landing screen, not stack another one on top of it.
     final navigator = MonCampusApp.navigatorKey.currentState;

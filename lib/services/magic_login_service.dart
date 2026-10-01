@@ -30,7 +30,8 @@ class MagicLoginService {
     final response = await _client.post(
       Uri.parse('${ApiConfig.baseUrl}/api/magic-login/request'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email}),
+      // The PWA's link must open the PWA, not the phone app (MagicLoginController::request()).
+      body: jsonEncode({'email': email, 'client': ApiConfig.clientName}),
     );
 
     if (response.statusCode != 200) {
@@ -47,7 +48,7 @@ class MagicLoginService {
     final response = await _client.post(
       Uri.parse('${ApiConfig.baseUrl}/api/magic-login/consume'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'token': token, 'client': 'moncampus'}),
+      body: jsonEncode({'token': token, 'client': ApiConfig.clientName}),
     );
 
     if (response.statusCode == 410) {

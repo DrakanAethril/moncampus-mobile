@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/work_item.dart';
 import '../services/auth_service.dart';
+import '../services/platform_bridge.dart';
 import '../services/quiz_service.dart';
 import '../services/work_service.dart';
 import '../theme/app_icons.dart';
@@ -244,12 +244,8 @@ class _StudentWorkViewState extends State<StudentWorkView> {
     }
 
     try {
-      final url =
-          await _workService.openAttachment(token, item.id, attachmentId);
-
-      if (url != null) {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      }
+      await openResolvedUrl(
+          () => _workService.openAttachment(token, item.id, attachmentId));
     } on WorkException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)

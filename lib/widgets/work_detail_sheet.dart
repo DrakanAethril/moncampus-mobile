@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/video_cue.dart';
 import '../models/video_watch_tracking.dart';
 import '../models/work_item.dart';
 import '../screens/survey_take_screen.dart';
 import '../screens/work_screen.dart' show WorkTag;
-import '../models/video_cue.dart';
 import '../services/auth_service.dart';
+import '../services/platform_bridge.dart';
 import '../services/video_cue_service.dart';
 import '../services/work_service.dart';
 import '../theme/app_icons.dart';
@@ -530,12 +531,8 @@ class _AttachmentRowState extends State<_AttachmentRow> {
     setState(() => _opening = true);
 
     try {
-      final url = await WorkService()
-          .openAttachment(token, widget.assignmentId, attachment.id!);
-
-      if (url != null) {
-        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      }
+      await openResolvedUrl(() => WorkService()
+          .openAttachment(token, widget.assignmentId, attachment.id!));
     } on WorkException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)

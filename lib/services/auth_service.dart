@@ -91,6 +91,9 @@ class AuthService extends ChangeNotifier {
   String? get token => _token;
 
   Future<bool> get canUseBiometrics async {
+    // A browser has no biometric prompt local_auth can reach: the PWA never offers the gate.
+    if (kIsWeb) return false;
+
     try {
       return await _localAuth.canCheckBiometrics &&
           await _localAuth.isDeviceSupported();
@@ -173,7 +176,7 @@ class AuthService extends ChangeNotifier {
     final response = await _client.post(
       Uri.parse('${ApiConfig.baseUrl}/api/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'username': username, 'password': password, 'client': 'moncampus'}),
+      body: jsonEncode({'username': username, 'password': password, 'client': ApiConfig.clientName}),
     );
 
     if (response.statusCode != 200) {

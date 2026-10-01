@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../models/quiz_live_state.dart';
 import 'api_config.dart';
+import 'platform_bridge.dart';
 
 class QuizLiveException implements Exception {
   QuizLiveException(this.message);
@@ -79,43 +80,20 @@ class QuizLiveService {
     }
   }
 
-  /// Hand-rolled SSE - Dart has no built-in EventSource. `http`'s streamed response is enough
-  /// since every Mercure update this feature publishes is a single-line `data:` JSON blob with no
-  /// custom `event:` name (see QuizLiveSessionService's publish calls, all default-"message"
-  /// updates) - the client dispatches on the payload's own `type` key instead. Unlike a browser's
-  /// native EventSource, this does not auto-reconnect; the caller (QuizLivePlayScreen) is
-  /// responsible for retrying via fetchState() + a fresh subscribe() on stream error/done.
+  /// The hub's updates, decoded. Every update this feature publishes is a single `data:` JSON blob
+  /// with no custom `event:` name (see QuizLiveSessionService's publish calls) - the client
+  /// dispatches on the payload's own `type` key instead. The stream itself is read by
+  /// platform_bridge (by hand on the phone, through fetch in the PWA); neither reconnects, so the
+  /// caller (QuizLivePlayScreen) retries via fetchState() + a fresh subscribe() on error or done.
   Stream<QuizLiveState> subscribe({
     required String mercurePublicUrl,
     required String topic,
     required String mercureToken,
-  }) async* {
+  }) {
     final uri = Uri.parse(mercurePublicUrl).replace(queryParameters: {'topic': topic});
-    final request = http.Request('GET', uri)
-      ..headers['Authorization'] = 'Bearer $mercureToken'
-      ..headers['Accept'] = 'text/event-stream';
 
-    final streamedResponse = await http.Client().send(request);
-    if (streamedResponse.statusCode != 200) {
-      throw QuizLiveException('Connexion au concours perdue.');
-    }
-
-    final lines = streamedResponse.stream.transform(utf8.decoder).transform(const LineSplitter());
-
-    final buffer = StringBuffer();
-    await for (final line in lines) {
-      if (line.isEmpty) {
-        if (buffer.isNotEmpty) {
-          yield QuizLiveState.fromJson(jsonDecode(buffer.toString()) as Map<String, dynamic>);
-          buffer.clear();
-        }
-        continue;
-      }
-      if (line.startsWith('data:')) {
-        buffer.write(line.substring(5).trimLeft());
-      }
-      // 'id:'/'retry:' lines and ':'-prefixed keep-alive comments are intentionally ignored.
-    }
+    return eventStreamData(uri, mercureToken).map(
+        (data) => QuizLiveState.fromJson(jsonDecode(data) as Map<String, dynamic>));
   }
 
   Map<String, String> _headers(String token) => {
