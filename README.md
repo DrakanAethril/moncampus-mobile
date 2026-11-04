@@ -19,13 +19,16 @@ A real Android phone only reaches a LAN address over plain HTTP in a **debug** b
 `android/app/src/debug/res/xml/network_security_config.xml` allows it there, and release builds keep
 the strict policy. Dev accounts: `admin` / `password` (fictitious LDAP seed).
 
-## The PWA (web version)
+## The PWA (web version) - retired
 
-The same app, compiled for the browser and served by moncampus at **`/campus-app/`** - for the
-iPhones no IPA reaches. `tool/build_pwa.sh` builds it (release, CanvasKit served locally) and
-publishes it into the moncampus repo's `public/campus-app/`; the `release-mobile-apps` skill runs
-it alongside the APK. A release web build calls the origin it was loaded from, so it is never given
-`API_BASE_URL`.
+The same app used to be compiled for the browser and served by moncampus at **`/campus-app/`**.
+It was **retired on 2026-11-04**: the Formatool site itself is now the installable app
+« beaup-app ». moncampus's `public/campus-app/` holds only `campus_sw.js`, a kill switch that cleans
+the phones which had installed the old web build, and every other `/campus-app/` address redirects
+to `/`. `tool/build_pwa.sh` now refuses to run, and the `release-mobile-apps` skill no longer calls
+it: publishing a build there would overwrite the kill switch and bring the retired app back.
+
+The web-only code below stays in the tree for now, with no build that ships it:
 
 What differs from the phone lives in one place, `lib/services/platform_bridge.dart` (the io half
 and the web half, the latter backed by `web/campus_web.js`): the live quiz's Mercure stream read
