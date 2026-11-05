@@ -9,9 +9,14 @@ import '../services/quiz_live_service.dart';
 import '../theme/app_theme.dart';
 
 /// Mobile counterpart to program/quiz_live_play.html.twig / quiz_live_play_controller.js -
-/// waiting room / countdown / question (shape+color only, never text - confirmed product
-/// decision) / reveal / podium, all driven by one Mercure SSE subscription plus periodic local
-/// countdown ticks anchored on server timestamps (never a client-reported elapsed time).
+/// waiting room / countdown / « regardez le tableau » / question (shape+color only, never text -
+/// confirmed product decision) / own verdict / own rank / podium, all driven by one Mercure SSE
+/// subscription plus periodic local countdown ticks anchored on server timestamps (never a
+/// client-reported elapsed time).
+///
+/// How a question is answered depends on its `kind`: one tap sends a choice or a vote; several
+/// shapes are ticked, or tapped in order, then « Valider »; a number is slid or typed; a word is
+/// typed. The server checks the shape of every answer anyway.
 class QuizLivePlayScreen extends StatefulWidget {
   const QuizLivePlayScreen({super.key, required this.sessionId, required this.connection});
 
@@ -32,7 +37,10 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
   Timer? _reconnectTimer;
 
   bool _answered = false;
-  int? _selectedShapeIndex;
+  final List<int> _picked = [];
+  double? _sliderValue;
+  final _numberController = TextEditingController();
+  final _textController = TextEditingController();
   int _remainingSeconds = 0;
   bool _cancelled = false;
 
@@ -41,6 +49,9 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
     super.initState();
     _connection = widget.connection;
     _state = widget.connection.state;
+    if ('question-opened' == _state.type) {
+      _prepareQuestion(_state);
+    }
     _startTick();
     _subscribe();
   }
@@ -50,6 +61,8 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
     _subscription?.cancel();
     _tickTimer?.cancel();
     _reconnectTimer?.cancel();
+    _numberController.dispose();
+    _textController.dispose();
     super.dispose();
   }
 
@@ -93,15 +106,28 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
   void _applyState(QuizLiveState state) {
     if (!mounted) return;
 
-    if ('question-opened' == state.type) {
-      _answered = false;
-      _selectedShapeIndex = null;
+    final isNewQuestion = 'question-opened' == state.type && ('question-opened' != _state.type || state.questionIndex != _state.questionIndex);
+    if (isNewQuestion) {
+      _prepareQuestion(state);
+    } else if ('question-opened' == state.type && state.answered == true) {
+      _answered = true;
     }
     if ('session-cancelled' == state.type) {
       _cancelled = true;
     }
 
     setState(() => _state = state);
+  }
+
+  /// A fresh question: nothing picked, the slider in the middle - like Kahoot's, the ends would
+  /// read as an answer - and, for a phone reloaded after answering, nothing offered again.
+  void _prepareQuestion(QuizLiveState state) {
+    _picked.clear();
+    _numberController.clear();
+    _textController.clear();
+    final range = state.range;
+    _sliderValue = range == null ? null : range.min + ((range.max - range.min) / 2 / range.step).round() * range.step;
+    _answered = state.answered == true;
   }
 
   void _startTick() {
@@ -117,27 +143,72 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
       final deadline = anchor.add(Duration(seconds: durationSeconds));
       final remaining = deadline.difference(DateTime.now()).inMilliseconds;
 
-      setState(() => _remainingSeconds = remaining > 0 ? (remaining / 1000).ceil() : 0);
+      setState(() {
+        _remainingSeconds = remaining > 0 ? (remaining / 1000).ceil() : 0;
+        // Out of time: the server refuses the answer anyway, the screen stops offering it.
+        if ('question-opened' == _state.type && remaining <= 0) _answered = true;
+      });
     });
   }
 
-  Future<void> _submitAnswer(QuizLiveAnswerOption option) async {
+  Future<void> _send(Map<String, Object> answer) async {
     if (_answered) return;
 
     final token = context.read<AuthService>().token;
     if (token == null) return;
 
-    setState(() {
-      _answered = true;
-      _selectedShapeIndex = option.shapeIndex;
-    });
+    setState(() => _answered = true);
 
     try {
-      await _quizLiveService.submitAnswer(token, widget.sessionId, option.answerId);
+      await _quizLiveService.submitAnswer(token, widget.sessionId, answer);
     } catch (_) {
       // The tap already locked the UI - a failed POST just means no points this round, not worth
       // surfacing an error mid-game (same "silent background failure" convention as
       // MainShell._refreshUnreadCount()).
+    }
+  }
+
+  // A shape: sent at once for a choice, ticked for a QCM multiple, numbered for an order.
+  void _tap(QuizLiveAnswerOption option) {
+    if (_answered) return;
+
+    switch (_state.kind) {
+      case 'multi':
+        setState(() => _picked.contains(option.answerId) ? _picked.remove(option.answerId) : _picked.add(option.answerId));
+      case 'order':
+        if (!_picked.contains(option.answerId)) setState(() => _picked.add(option.answerId));
+      default:
+        setState(() => _picked
+          ..clear()
+          ..add(option.answerId));
+        _send({'answerIds': [option.answerId]});
+    }
+  }
+
+  bool get _canValidate {
+    if (_answered) return false;
+    return switch (_state.kind) {
+      'multi' => _picked.isNotEmpty,
+      'order' => _picked.length == (_state.answers?.length ?? 0),
+      'number' => _state.range != null || double.tryParse(_numberController.text.replaceAll(',', '.')) != null,
+      'text' => _textController.text.trim().isNotEmpty,
+      _ => false,
+    };
+  }
+
+  void _validate() {
+    if (!_canValidate) return;
+
+    switch (_state.kind) {
+      case 'multi':
+        _send({'answerIds': List<int>.of(_picked)});
+      case 'order':
+        _send({'order': List<int>.of(_picked)});
+      case 'number':
+        final value = _state.range != null ? _sliderValue : double.tryParse(_numberController.text.replaceAll(',', '.'));
+        if (value != null) _send({'value': value});
+      case 'text':
+        _send({'text': _textController.text.trim()});
     }
   }
 
@@ -162,10 +233,14 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
     switch (_state.type) {
       case 'countdown-started':
         return _buildCountdown();
+      case 'question-reading':
+        return _buildReading();
       case 'question-opened':
         return _buildQuestion();
-      case 'reveal':
-        return _buildReveal();
+      case 'results':
+        return _buildResults();
+      case 'scoreboard':
+        return _buildScoreboard();
       case 'session-finished':
         return _buildFinished();
       case 'session-cancelled':
@@ -174,6 +249,37 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
       default:
         return _buildLobby();
     }
+  }
+
+  String get _counter => '${(_state.questionIndex ?? 0) + 1}/${_state.totalQuestions ?? '?'}';
+
+  String get _hint {
+    if (_state.isVote == true) return 'Votez pour une proposition';
+    return switch (_state.kind) {
+      'multi' => 'Plusieurs bonnes réponses : cochez-les, puis validez',
+      'order' => 'Touchez les formes dans le bon ordre, puis validez',
+      'number' => 'Choisissez la valeur, puis validez',
+      'text' => 'Tapez votre réponse, puis validez',
+      _ => 'Touchez la bonne forme',
+    };
+  }
+
+  Widget _buildReading() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('QUESTION $_counter', style: const TextStyle(color: AppColors.gold, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 3)),
+          const SizedBox(height: 18),
+          const Text('Regardez le tableau', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(_hint, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF9DB4C6), fontSize: 13)),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildLobby() {
@@ -223,7 +329,7 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
   }
 
   Widget _buildQuestion() {
-    final answers = _state.answers ?? const [];
+    final kind = _state.kind ?? 'choice';
 
     return Column(
       children: [
@@ -233,7 +339,7 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
             children: [
               const Text('CONCOURS', style: TextStyle(color: AppColors.gold, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 2)),
               const Spacer(),
-              Text('Q ${(_state.questionIndex ?? 0) + 1}/${_state.totalQuestions ?? '?'}', style: const TextStyle(color: Color(0xFF9DB4C6), fontSize: 13)),
+              Text('Q $_counter', style: const TextStyle(color: Color(0xFF9DB4C6), fontSize: 13)),
               const SizedBox(width: 10),
               Container(
                 width: 38,
@@ -251,16 +357,44 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
             ],
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
+          child: Text(_hint, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF9DB4C6), fontSize: 13)),
+        ),
+        const SizedBox(height: 8),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: answers
-                  .map((option) => Expanded(child: _buildShapeButton(option)))
-                  .toList(),
-            ),
+            child: switch (kind) {
+              'number' => _buildNumber(),
+              'text' => _buildText(),
+              _ => _buildShapes(),
+            },
           ),
         ),
+        if ('choice' != kind)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
+              children: [
+                if ('order' == kind) ...[
+                  TextButton(
+                    onPressed: _answered ? null : () => setState(_picked.clear),
+                    style: TextButton.styleFrom(foregroundColor: Colors.white, side: const BorderSide(color: Colors.white24)),
+                    child: const Text('Recommencer'),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: FilledButton(
+                    onPressed: _canValidate ? _validate : null,
+                    style: FilledButton.styleFrom(backgroundColor: AppColors.gold, foregroundColor: const Color(0xFF12344D)),
+                    child: const Text('Valider', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.all(18),
           child: Text(
@@ -273,8 +407,32 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
     );
   }
 
+  // Two columns as soon as there are more than four shapes, like Kahoot's six.
+  Widget _buildShapes() {
+    final answers = _state.answers ?? const [];
+    if (answers.length <= 4) {
+      return Column(children: answers.map((option) => Expanded(child: _buildShapeButton(option))).toList());
+    }
+
+    final rows = <Widget>[];
+    for (var i = 0; i < answers.length; i += 2) {
+      rows.add(Expanded(
+        child: Row(
+          children: [
+            Expanded(child: _buildShapeButton(answers[i])),
+            const SizedBox(width: 10),
+            Expanded(child: i + 1 < answers.length ? _buildShapeButton(answers[i + 1]) : const SizedBox.shrink()),
+          ],
+        ),
+      ));
+    }
+
+    return Column(children: rows);
+  }
+
   Widget _buildShapeButton(QuizLiveAnswerOption option) {
-    final selected = _answered && _selectedShapeIndex == option.shapeIndex;
+    final at = _picked.indexOf(option.answerId);
+    final selected = at >= 0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -283,13 +441,25 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: _answered ? null : () => _submitAnswer(option),
+          onTap: _answered ? null : () => _tap(option),
           child: Container(
             decoration: selected ? BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.white, width: 3)) : null,
             alignment: Alignment.center,
-            child: Opacity(
-              opacity: _answered && !selected ? 0.55 : 1,
-              child: Text(_glyphFor(option.shape), style: const TextStyle(fontSize: 34, color: Colors.white)),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Opacity(
+                  opacity: _answered && !selected ? 0.55 : 1,
+                  child: Text(_glyphFor(option.shape), style: const TextStyle(fontSize: 34, color: Colors.white)),
+                ),
+                // The place a shape was tapped at, for a remise en ordre.
+                if ('order' == _state.kind && selected)
+                  Positioned(
+                    top: 8,
+                    right: 12,
+                    child: Text('${at + 1}', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                  ),
+              ],
             ),
           ),
         ),
@@ -297,21 +467,127 @@ class _QuizLivePlayScreenState extends State<QuizLivePlayScreen> {
     );
   }
 
-  Widget _buildReveal() {
+  Widget _buildNumber() {
+    final range = _state.range;
+    final unit = (_state.unit ?? '').isEmpty ? '' : ' ${_state.unit}';
+
+    if (range == null) {
+      return Center(
+        child: TextField(
+          controller: _numberController,
+          enabled: !_answered,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+          textAlign: TextAlign.center,
+          onChanged: (_) => setState(() {}),
+          style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w600),
+          decoration: InputDecoration(suffixText: unit.trim(), suffixStyle: const TextStyle(color: Color(0xFF9DB4C6))),
+        ),
+      );
+    }
+
+    final value = _sliderValue ?? range.min;
+    final divisions = ((range.max - range.min) / range.step).round();
+
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          '${_formatNumber(value)}$unit',
+          style: const TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 18),
+        Slider(
+          value: value.clamp(range.min, range.max),
+          min: range.min,
+          max: range.max,
+          divisions: divisions > 0 && divisions <= 100000 ? divisions : null,
+          activeColor: AppColors.gold,
+          onChanged: _answered ? null : (next) => setState(() => _sliderValue = next),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(_formatNumber(range.min), style: const TextStyle(color: Color(0xFF9DB4C6))),
+            Text(_formatNumber(range.max), style: const TextStyle(color: Color(0xFF9DB4C6))),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildText() {
+    return Center(
+      child: TextField(
+        controller: _textController,
+        enabled: !_answered,
+        maxLength: 200,
+        autocorrect: false,
+        textAlign: TextAlign.center,
+        textInputAction: TextInputAction.send,
+        onChanged: (_) => setState(() {}),
+        onSubmitted: (_) => _validate(),
+        style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w600),
+        decoration: const InputDecoration(counterText: ''),
+      ),
+    );
+  }
+
+  String _formatNumber(double value) =>
+      value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(2).replaceAll('.', ',');
+
+  // The verdict comes from the server, under this phone's participant id - it survives a
+  // reconnect, which a choice remembered on this screen did not.
+  Widget _buildResults() {
     final mine = _findMyEntry(_state.leaderboard);
-    final resultLabel = _selectedShapeIndex == null
-        ? ''
-        : (_selectedShapeIndex == _state.correctShapeIndex ? '✓ Bonne réponse' : '✗ Mauvaise réponse');
+    final outcome = _state.outcomes?['${_connection.participantId}'];
+    final isVote = _state.isVote == true;
+
+    final String label;
+    final Color color;
+    if (outcome == null || !outcome.answered) {
+      label = 'Pas de réponse';
+      color = const Color(0xFFFF9B8F);
+    } else if (isVote) {
+      label = '✓ Vote enregistré';
+      color = AppColors.gold;
+    } else if (outcome.correct == true) {
+      label = '✓ Bonne réponse';
+      color = const Color(0xFF7FD99A);
+    } else {
+      label = '✗ Mauvaise réponse';
+      color = const Color(0xFFFF9B8F);
+    }
 
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(resultLabel, style: const TextStyle(color: AppColors.gold, fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 1)),
+          Text(label, style: TextStyle(color: color, fontSize: 26, fontWeight: FontWeight.bold)),
+          if (!isVote) ...[
+            const SizedBox(height: 10),
+            Text('+ ${outcome?.points ?? 0} points', style: const TextStyle(color: Color(0xFF9DB4C6), fontSize: 18)),
+          ],
           const SizedBox(height: 18),
-          Text('${mine?.score ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 54, fontWeight: FontWeight.bold)),
+          Text('${mine?.score ?? 0}', style: const TextStyle(color: Colors.white, fontSize: 46, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
           Text('Ton classement : ${mine != null ? '#${mine.rank}' : '—'}', style: const TextStyle(color: Color(0xFF9DB4C6), fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScoreboard() {
+    final mine = _findMyEntry(_state.leaderboard);
+
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('CLASSEMENT', style: TextStyle(color: AppColors.gold, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 3)),
+          const SizedBox(height: 18),
+          Text(mine != null ? '#${mine.rank}' : '—', style: const TextStyle(color: AppColors.gold, fontSize: 60, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text('${mine?.score ?? 0} pts', style: const TextStyle(color: Color(0xFF9DB4C6), fontSize: 15)),
         ],
       ),
     );
@@ -363,6 +639,8 @@ Color _colorFor(String color) => switch (color) {
       'gold' => AppColors.gold,
       'green' => const Color(0xFF2E7D4F),
       'red' => AppColors.redTx,
+      'purple' => const Color(0xFF7A4FB5),
+      'teal' => const Color(0xFF1D8584),
       _ => AppColors.brand,
     };
 
@@ -371,5 +649,7 @@ String _glyphFor(String shape) => switch (shape) {
       'square' => '■',
       'circle' => '●',
       'diamond' => '◆',
+      'pentagon' => '⬟',
+      'triangle-down' => '▼',
       _ => '',
     };
