@@ -43,8 +43,41 @@ class QuizLiveLeaderboardEntry {
   final int rank;
 }
 
-/// One envelope shape covers every phase (lobby/countdown-started/question-opened/reveal/
-/// session-finished/session-cancelled), discriminated by [type] - mirrors the JSON payloads
+/// What one participant got on the question just closed, read off the results payload's
+/// `outcomes` under their participant id - the server's verdict, so it survives a reconnect.
+class QuizLiveOutcome {
+  const QuizLiveOutcome({required this.answered, required this.correct, required this.points});
+
+  factory QuizLiveOutcome.fromJson(Map<String, dynamic> json) => QuizLiveOutcome(
+        answered: json['answered'] as bool? ?? false,
+        correct: json['correct'] as bool?,
+        points: json['points'] as int? ?? 0,
+      );
+
+  final bool answered;
+
+  /// Null for a vote, which is neither right nor wrong.
+  final bool? correct;
+  final int points;
+}
+
+/// The slider a numeric question is answered on, when the question has one.
+class QuizLiveRange {
+  const QuizLiveRange({required this.min, required this.max, required this.step});
+
+  factory QuizLiveRange.fromJson(Map<String, dynamic> json) => QuizLiveRange(
+        min: (json['min'] as num).toDouble(),
+        max: (json['max'] as num).toDouble(),
+        step: (json['step'] as num).toDouble(),
+      );
+
+  final double min;
+  final double max;
+  final double step;
+}
+
+/// One envelope shape covers every phase (lobby/countdown-started/question-reading/
+/// question-opened/results/scoreboard/session-finished/session-cancelled), discriminated by [type] - mirrors the JSON payloads
 /// App\Service\QuizLiveSessionService publishes over Mercure (and the same shape
 /// Api\QuizLiveController returns for the initial join()/state() snapshot), and the same
 /// switch-on-type dispatch as assets/controllers/quiz_live_play_controller.js on the web side.
@@ -61,7 +94,12 @@ class QuizLiveState {
     this.secondsPerQuestion,
     this.phaseStartedAt,
     this.answers,
-    this.correctShapeIndex,
+    this.kind,
+    this.isVote,
+    this.range,
+    this.unit,
+    this.answered,
+    this.outcomes,
     this.leaderboard,
     this.isLastQuestion,
     this.finalLeaderboard,
@@ -80,7 +118,16 @@ class QuizLiveState {
         answers: (json['answers'] as List<dynamic>?)
             ?.map((a) => QuizLiveAnswerOption.fromJson(a as Map<String, dynamic>))
             .toList(),
-        correctShapeIndex: json['correctShapeIndex'] as int?,
+        kind: json['kind'] as String?,
+        isVote: json['isVote'] as bool?,
+        range: json['range'] != null ? QuizLiveRange.fromJson(json['range'] as Map<String, dynamic>) : null,
+        unit: json['unit'] as String?,
+        answered: json['answered'] as bool?,
+        // An empty map comes out of PHP as a JSON list - nobody answered yet.
+        outcomes: json['outcomes'] is Map<String, dynamic>
+            ? (json['outcomes'] as Map<String, dynamic>)
+                .map((key, value) => MapEntry(key, QuizLiveOutcome.fromJson(value as Map<String, dynamic>)))
+            : null,
         leaderboard: (json['leaderboard'] as List<dynamic>?)
             ?.map((e) => QuizLiveLeaderboardEntry.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -102,7 +149,17 @@ class QuizLiveState {
   final int? secondsPerQuestion;
   final DateTime? phaseStartedAt;
   final List<QuizLiveAnswerOption>? answers;
-  final int? correctShapeIndex;
+
+  /// How the question is answered (App\Service\QuizLive\LiveAnswerKind on the backend):
+  /// choice, multi, order, number or text.
+  final String? kind;
+  final bool? isVote;
+  final QuizLiveRange? range;
+  final String? unit;
+
+  /// Only in a snapshot asked for by this participant: whether they already answered.
+  final bool? answered;
+  final Map<String, QuizLiveOutcome>? outcomes;
   final List<QuizLiveLeaderboardEntry>? leaderboard;
   final bool? isLastQuestion;
   final List<QuizLiveLeaderboardEntry>? finalLeaderboard;

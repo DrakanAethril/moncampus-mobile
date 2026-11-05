@@ -67,12 +67,14 @@ class QuizLiveService {
     return QuizLiveConnection.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  Future<void> submitAnswer(String token, int sessionId, int answerId) async {
+  /// [answer] is one of `{answerIds: [...]}` (a choice, several, a vote), `{order: [...]}`,
+  /// `{value: 12.5}` or `{text: '…'}` - the server checks its shape against the question.
+  Future<void> submitAnswer(String token, int sessionId, Map<String, Object> answer) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/api/quiz-live/$sessionId/answer');
     final response = await _client.post(
       uri,
       headers: {..._headers(token), 'Content-Type': 'application/json'},
-      body: jsonEncode({'answerId': answerId}),
+      body: jsonEncode(answer),
     );
 
     if (response.statusCode != 200) {
